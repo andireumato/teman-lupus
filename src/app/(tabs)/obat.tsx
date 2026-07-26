@@ -1,3 +1,4 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useCallback, useState } from 'react';
 import { Link, useFocusEffect } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
@@ -110,14 +111,21 @@ export default function ObatScreen() {
     return events.find((e) => e.medication_id === medId && e.jenis === 'stop')?.tanggal ?? null;
   }
 
+  /**
+   * Menandai satu dosis.
+   *
+   * Sengaja TIDAK memanggil `muat()` sesudah berhasil: `muat()` menyalakan
+   * `loading`, seluruh layar diganti spinner, lalu dirakit ulang — dan ketukan
+   * berikutnya jatuh di spinner itu. Pada obat 3x sehari yang ditandai
+   * berturut-turut, tombolnya jadi terasa mati. Keadaan di layar sudah benar
+   * dari pembaruan optimistis; jaringan hanya perlu menyusul.
+   */
   async function tandai(med: Medication, dosisKe: number, diminum: boolean) {
     if (!patientId) return;
     setErr(null);
 
     const k = kunciDosis(med.id, dosisKe);
     const sebelumnya = logs;
-    // Optimistic: pasien menandai obat berkali-kali sehari; menunggu jaringan
-    // membuat tombol terasa rusak.
     setLogs((prev) => ({
       ...prev,
       [k]: {
@@ -142,9 +150,7 @@ export default function ObatScreen() {
     if (error) {
       setLogs(sebelumnya);
       setErr(pesanSkemaObat(`Gagal menyimpan: ${error.message}`));
-      return;
     }
-    await muat();
   }
 
   async function simpanObat() {
@@ -279,39 +285,37 @@ export default function ObatScreen() {
               </Pressable>
             </View>
 
-            {/* Satu baris per dosis: obat 3x sehari perlu tiga tanda. */}
+            {/*
+              Satu baris centang per dosis: obat 3x sehari perlu tiga tanda.
+              Seluruh barisnya yang bisa diketuk, bukan kotak kecilnya saja —
+              sasaran ketuk setinggi 44pt, sesuai baris obat lain.
+            */}
             {Array.from({ length: n }, (_, i) => i + 1).map((dosisKe) => {
               const log = logs[kunciDosis(m.id, dosisKe)];
+              const sudah = log?.diminum === true;
               return (
-                <View key={dosisKe} style={styles.dosisBaris}>
-                  {n > 1 && <Text style={styles.dosisLabel}>Dosis {dosisKe}</Text>}
-                  <View style={styles.aksi}>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel={`${m.nama_obat} dosis ${dosisKe} sudah diminum`}
-                      onPress={() => void tandai(m, dosisKe, true)}
-                      style={[styles.tombol, log?.diminum === true && styles.tombolYa]}
-                    >
-                      <Text
-                        style={[styles.tombolText, log?.diminum === true && styles.tombolTextOn]}
-                      >
-                        ✓ Sudah
-                      </Text>
-                    </Pressable>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel={`${m.nama_obat} dosis ${dosisKe} belum diminum`}
-                      onPress={() => void tandai(m, dosisKe, false)}
-                      style={[styles.tombol, log?.diminum === false && styles.tombolTidak]}
-                    >
-                      <Text
-                        style={[styles.tombolText, log?.diminum === false && styles.tombolTextOn]}
-                      >
-                        ✕ Belum
-                      </Text>
-                    </Pressable>
+                <Pressable
+                  key={dosisKe}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: sudah }}
+                  accessibilityLabel={
+                    n > 1 ? `${m.nama_obat} dosis ke-${dosisKe}` : `${m.nama_obat} sudah diminum`
+                  }
+                  onPress={() => void tandai(m, dosisKe, !sudah)}
+                  style={({ pressed }) => [
+                    styles.dosisBaris,
+                    sudah && styles.dosisBarisOn,
+                    pressed && styles.dosisBarisPressed,
+                  ]}
+                >
+                  <View style={[styles.kotak, sudah && styles.kotakOn]}>
+                    {sudah && <Ionicons name="checkmark" size={15} color="#fff" />}
                   </View>
-                </View>
+                  <Text style={[styles.dosisLabel, sudah && styles.dosisLabelOn]}>
+                    {n > 1 ? `Dosis ke-${dosisKe}` : 'Sudah diminum hari ini'}
+                  </Text>
+                  {log?.diminum === false && <Text style={styles.belum}>ditandai belum</Text>}
+                </Pressable>
               );
             })}
           </Card>
@@ -393,24 +397,33 @@ const styles = StyleSheet.create({
   medMeta: { fontSize: 12.5, color: Brand.teksLembut, marginTop: 2 },
   hapus: { fontSize: 12, color: Brand.merah, fontWeight: '600' },
   lanjut: { fontSize: 12, color: Brand.ungu, fontWeight: '700' },
-  dosisBaris: { gap: 4, marginTop: space.xs },
-  dosisLabel: { fontSize: 12, fontWeight: '600', color: '#4b5563' },
-  aksi: { flexDirection: 'row', gap: space.sm },
-  tombol: {
-    flex: 1,
+  dosisBaris: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
+    minHeight: 44,
+    paddingHorizontal: space.md,
     borderWidth: 1,
     borderColor: '#d1d5db',
     borderRadius: radius.md,
-    paddingVertical: 11,
-    alignItems: 'center',
     backgroundColor: '#fff',
-    minHeight: 44,
-    justifyContent: 'center',
   },
-  tombolYa: { backgroundColor: Brand.hijau, borderColor: Brand.hijau },
-  tombolTidak: { backgroundColor: Brand.teksLembut, borderColor: Brand.teksLembut },
-  tombolText: { fontSize: 13.5, fontWeight: '600', color: '#374151' },
-  tombolTextOn: { color: '#fff' },
+  dosisBarisOn: { borderColor: Brand.hijau, backgroundColor: Brand.hijauMuda },
+  dosisBarisPressed: { opacity: 0.7 },
+  kotak: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 1.5,
+    borderColor: '#9ca3af',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+  },
+  kotakOn: { backgroundColor: Brand.hijau, borderColor: Brand.hijau },
+  dosisLabel: { flex: 1, fontSize: 13.5, fontWeight: '600', color: '#374151' },
+  dosisLabelOn: { color: '#166534' },
+  belum: { fontSize: 11, color: Brand.teksLembut },
   lamaBaris: {
     flexDirection: 'row',
     alignItems: 'center',
