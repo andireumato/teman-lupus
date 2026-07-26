@@ -1,24 +1,38 @@
 import { labAbnormal, labRef, SISTEM_GEJALA, SKALA_LELAH, SKALA_NYERI_SENDI } from './lupus';
 
-describe('skala kelelahan', () => {
-  it('bernilai 0–3 berurutan, sama panjang dengan nyeri sendi', () => {
-    expect(SKALA_LELAH.map((o) => o.v)).toEqual([0, 1, 2, 3]);
-    expect(SKALA_LELAH).toHaveLength(SKALA_NYERI_SENDI.length);
+describe.each([
+  ['kelelahan', SKALA_LELAH],
+  ['nyeri sendi', SKALA_NYERI_SENDI],
+])('skala %s', (_nama, skala) => {
+  it('bernilai 0–3 berurutan', () => {
+    expect(skala.map((o) => o.v)).toEqual([0, 1, 2, 3]);
   });
 
-  it('setiap tingkat di atas "Tidak ada" punya patokan fungsional', () => {
+  it('setiap tingkat di atas "Tidak ada" punya patokan', () => {
     // Tingkat tanpa patokan membuat pasien menebak bedanya, dan hitungan hari
     // di bagian 3 ringkasan pra-kunjungan jadi tidak sebanding antar pasien.
-    for (const o of SKALA_LELAH.filter((x) => x.v > 0)) {
+    for (const o of skala.filter((x) => x.v > 0)) {
       expect(o.ket?.trim()).toBeTruthy();
     }
   });
 
-  it('patokannya menyebut fungsi, bukan sekadar rasa capek', () => {
-    const semua = SKALA_LELAH.map((o) => o.ket ?? '').join(' ');
-    expect(semua).toMatch(/istirahat/);
-    expect(semua).toMatch(/aktivitas|pekerjaan|mengurus diri/);
+  it('patokannya menyebut dampak pada kegiatan, bukan sekadar rasa', () => {
+    const semua = skala.map((o) => o.ket ?? '').join(' ');
+    expect(semua).toMatch(/kegiatan|aktivitas|pekerjaan|mengurus diri/);
   });
+
+  it('punya kode warna dan tidak memakai emoji', () => {
+    // Emoji tidak dijamin punya glyph di aplikasi native — lihat catatan di
+    // components/mood-scale.tsx. Kode warna dipakai sebagai gantinya.
+    for (const o of skala) {
+      expect(o.warna).toMatch(/^#[0-9a-f]{6}$/i);
+      expect(`${o.label} ${o.ket ?? ''}`).not.toMatch(/\p{Extended_Pictographic}/u);
+    }
+  });
+});
+
+it('kedua skala keluhan sama panjang', () => {
+  expect(SKALA_LELAH).toHaveLength(SKALA_NYERI_SENDI.length);
 });
 
 describe('nilai rujukan lab', () => {

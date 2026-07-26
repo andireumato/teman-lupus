@@ -7,6 +7,8 @@
  * wajib direview reumatolog sebelum dipakai ke pasien nyata.
  */
 
+import { Brand } from '@/constants/brand';
+
 export interface LabRef {
   /** Nama pemeriksaan, dipakai sebagai kolom `jenis` di lab_results. */
   k: string;
@@ -133,7 +135,19 @@ export interface OpsiSkala {
   label: string;
   /** Keterangan pendek di bawah label, bila ada. */
   ket?: string;
+  /**
+   * Titik berwarna di kiri label.
+   *
+   * Reumatolog menuliskan tingkatannya dengan emoji (⚪🟢🟡🔴). Emoji tidak
+   * dipakai di aplikasi native — tidak dijamin punya glyph dan bisa tampil
+   * sebagai kotak kosong, lihat catatan di `components/mood-scale.tsx` —
+   * jadi kode warnanya diwujudkan sebagai titik.
+   */
+  warna?: string;
 }
+
+/** Abu → hijau → kuning → merah, untuk skala 0–3 yang makin berat. */
+const WARNA_TINGKAT = [Brand.teksLembut, Brand.hijau, Brand.kuning, Brand.merah];
 
 /**
  * Patokan tiap tingkat kelelahan ditulis reumatolog penanggung jawab
@@ -152,27 +166,56 @@ export interface OpsiSkala {
  * tersimpan ulang diam-diam) dan `BarChart` di `tren.tsx` (tinggi bar dibatasi).
  */
 export const SKALA_LELAH: OpsiSkala[] = [
-  { v: 0, label: 'Tidak ada' },
+  { v: 0, label: 'Tidak ada', warna: WARNA_TINGKAT[0] },
   {
     v: 1,
     label: 'Ringan',
     ket: 'Lelah, tapi hilang setelah istirahat; aktivitas harian normal tetap jalan.',
+    warna: WARNA_TINGKAT[1],
   },
   {
     v: 2,
     label: 'Sedang',
     ket: 'Lelah tidak hilang dengan istirahat; pekerjaan rumah/kantor, belanja, atau ibadah jadi terganggu atau harus dikurangi.',
+    warna: WARNA_TINGKAT[2],
   },
   {
     v: 3,
     label: 'Berat',
     ket: 'Lelah sampai kesulitan mengurus diri sendiri (mandi, berpakaian, makan); sebagian besar hari dihabiskan berbaring.',
+    warna: WARNA_TINGKAT[3],
   },
 ];
 
-export const SKALA_NYERI_SENDI = [
-  { v: 0, label: 'Tidak ada' },
-  { v: 1, label: 'Ringan' },
-  { v: 2, label: 'Sedang' },
-  { v: 3, label: 'Berat' },
+/**
+ * Patokan tiap tingkat nyeri sendi, ditulis reumatolog penanggung jawab
+ * (27 Juli 2026). Sama seperti `SKALA_LELAH`, patokannya berbasis dampak pada
+ * kegiatan — bukan seberapa "sakit" rasanya — supaya penilaian pasien
+ * konsisten antar hari dan antar pasien.
+ */
+export const SKALA_NYERI_SENDI: OpsiSkala[] = [
+  {
+    v: 0,
+    label: 'Tidak ada',
+    ket: 'Tidak ada nyeri sendi sama sekali.',
+    warna: WARNA_TINGKAT[0],
+  },
+  {
+    v: 1,
+    label: 'Ringan',
+    ket: 'Terasa nyeri, tetapi bisa saya abaikan; kegiatan sehari-hari tetap berjalan seperti biasa.',
+    warna: WARNA_TINGKAT[1],
+  },
+  {
+    v: 2,
+    label: 'Sedang',
+    ket: 'Nyeri mengganggu; saya harus mengurangi atau memperlambat kegiatan.',
+    warna: WARNA_TINGKAT[2],
+  },
+  {
+    v: 3,
+    label: 'Berat',
+    ket: 'Nyeri membuat sendi hampir tidak bisa digunakan, atau membuat saya terbangun di malam hari.',
+    warna: WARNA_TINGKAT[3],
+  },
 ];

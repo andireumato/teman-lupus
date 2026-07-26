@@ -16,7 +16,6 @@ import {
   PrimaryButton,
   Screen,
   SectionLabel,
-  Segmented,
   SegmentedVertical,
 } from '@/components/ui/kit';
 import { Brand, space } from '@/constants/brand';
@@ -202,7 +201,7 @@ export default function CheckinFormScreen() {
         <SegmentedVertical options={SKALA_LELAH} value={lelah} onChange={setLelah} />
 
         <SectionLabel>Nyeri sendi</SectionLabel>
-        <Segmented options={SKALA_NYERI_SENDI} value={nyeri} onChange={setNyeri} />
+        <SegmentedVertical options={SKALA_NYERI_SENDI} value={nyeri} onChange={setNyeri} />
       </Card>
 
       <Card>

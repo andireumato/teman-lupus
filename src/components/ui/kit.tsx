@@ -182,7 +182,7 @@ export function SegmentedVertical<T extends string | number>({
   value,
   onChange,
 }: {
-  options: { v: T; label: string; ket?: string }[];
+  options: { v: T; label: string; ket?: string; warna?: string }[];
   value: T | null;
   onChange: (v: T) => void;
 }) {
@@ -195,11 +195,15 @@ export function SegmentedVertical<T extends string | number>({
             key={String(o.v)}
             accessibilityRole="radio"
             accessibilityState={{ selected: on }}
+            // Warna hanya penguat; maknanya tetap ada di label & keterangan.
             accessibilityLabel={o.ket ? `${o.label}. ${o.ket}` : o.label}
             onPress={() => onChange(o.v)}
             style={[styles.segVItem, on && styles.segVItemOn]}
           >
-            <Text style={[styles.segVLabel, on && styles.segVLabelOn]}>{o.label}</Text>
+            <View style={styles.segVHead}>
+              {o.warna && <View style={[styles.segVTitik, { backgroundColor: o.warna }]} />}
+              <Text style={[styles.segVLabel, on && styles.segVLabelOn]}>{o.label}</Text>
+            </View>
             {o.ket && <Text style={[styles.segVKet, on && styles.segVKetOn]}>{o.ket}</Text>}
           </Pressable>
         );
@@ -336,6 +340,8 @@ const styles = StyleSheet.create({
   // Latar dibuat lembut, bukan ungu penuh seperti Segmented: teks keterangan
   // di baris terpilih harus tetap terbaca.
   segVItemOn: { backgroundColor: Brand.unguMuda, borderColor: Brand.ungu },
+  segVHead: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  segVTitik: { width: 10, height: 10, borderRadius: 5 },
   segVLabel: { fontSize: 14, fontWeight: '600', color: '#374151' },
   segVLabelOn: { color: Brand.ungu, fontWeight: '700' },
   segVKet: { fontSize: 11.5, color: Brand.teksLembut, lineHeight: 16 },

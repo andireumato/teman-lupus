@@ -66,7 +66,7 @@ npm start                 # lalu tekan i (iOS) / a (Android), atau pindai QR den
 
 | Perintah            | Fungsi                                         |
 | ------------------- | ---------------------------------------------- |
-| `npm test`          | Unit test (red-flag, ringkasan, MARS-5, UV, beranda, tanggal) — 148 test |
+| `npm test`          | Unit test (red-flag, ringkasan, MARS-5, UV, beranda, tanggal) — 154 test |
 | `npm run typecheck` | Cek tipe TypeScript                            |
 | `npm run lint`      | ESLint + Prettier                              |
 | `npm run format`    | Rapikan format kode                            |
@@ -133,17 +133,29 @@ insight personal.
 Kutipan dan tips berputar berdasarkan hari-ke-berapa dalam setahun, jadi semua
 pasien melihat konten yang sama pada hari yang sama.
 
-### Patokan skala kelelahan
+### Patokan skala kelelahan & nyeri sendi
 
-Tingkat kelelahan di formulir check-in punya keterangan pendek di bawah tiap
-pilihan (`SKALA_LELAH` di `src/constants/lupus.ts`), ditulis reumatolog
-penanggung jawab. Patokannya sengaja berbasis **fungsi** — apa yang masih bisa
-dikerjakan pasien — bukan seberapa "capek" rasanya, supaya penilaiannya
-konsisten antar hari dan antar pasien, dan supaya hitungan di bagian 3
-ringkasan pra-kunjungan berarti sama bagi semua orang.
+Kedua skala keluhan di formulir check-in (`SKALA_LELAH` dan
+`SKALA_NYERI_SENDI` di `src/constants/lupus.ts`) punya keterangan pendek di
+bawah tiap pilihan, ditulis reumatolog penanggung jawab. Patokannya sengaja
+berbasis **dampak pada kegiatan** — apa yang masih bisa dikerjakan pasien —
+bukan seberapa "capek" atau "sakit" rasanya, supaya penilaiannya konsisten
+antar hari dan antar pasien, dan supaya hitungan hari di bagian 3 ringkasan
+pra-kunjungan berarti sama bagi semua orang.
 
 Karena butuh ruang untuk kalimat, pilihannya memakai `SegmentedVertical`
 (bertumpuk ke bawah), bukan `Segmented` (berjajar).
+
+Tiap tingkat juga punya titik berwarna (abu → hijau → kuning → merah).
+Reumatolog menuliskan tingkatannya dengan emoji ⚪🟢🟡🔴; emoji **tidak**
+dipakai di aplikasi native karena tidak dijamin punya glyph dan bisa tampil
+sebagai kotak kosong (lihat catatan di `components/mood-scale.tsx`), jadi kode
+warnanya diwujudkan sebagai titik. Warna hanya penguat — maknanya tetap ada di
+label dan keterangannya, termasuk untuk pembaca layar.
+
+Dijaga test di `src/constants/lupus.test.ts`: kedua skala wajib 0–3 berurutan,
+setiap tingkat di atas "Tidak ada" wajib punya patokan, patokannya wajib
+menyebut dampak pada kegiatan, dan tidak boleh ada emoji yang menyelinap masuk.
 
 Tingkat **"Sangat berat" (nilai 4) dihapus** 27 Juli 2026: patokan "Berat"
 sudah mencakup pasien yang sebagian besar harinya berbaring, jadi tidak ada
