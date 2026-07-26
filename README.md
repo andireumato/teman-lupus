@@ -58,7 +58,7 @@ npm start                 # lalu tekan i (iOS) / a (Android), atau pindai QR den
 
 | Perintah            | Fungsi                                         |
 | ------------------- | ---------------------------------------------- |
-| `npm test`          | Unit test (red-flag, MARS-5, UV, beranda, tanggal) — 98 test |
+| `npm test`          | Unit test (red-flag, ringkasan, MARS-5, UV, beranda, tanggal) — 134 test |
 | `npm run typecheck` | Cek tipe TypeScript                            |
 | `npm run lint`      | ESLint + Prettier                              |
 | `npm run format`    | Rapikan format kode                            |
@@ -80,6 +80,7 @@ src/
     consent.tsx           informed consent, wajib sebelum masuk
     checkin.tsx           formulir check-in harian + layar apresiasi
     mars.tsx              kuesioner MARS-5
+    ringkasan.tsx         ringkasan pra-kunjungan (Bagian 8 spesifikasi)
     (tabs)/
       index.tsx           Beranda
       flare.tsx           Cek Flare (triase tanda bahaya)
@@ -88,6 +89,7 @@ src/
       tren.tsx            Grafik, riwayat, akun
   lib/
     redflag.ts            red-flag engine [DETERMINISTIK]
+    ringkasan.ts          perakit ringkasan pra-kunjungan + versi teksnya
     beranda.ts            salam, konten harian, tingkatan streak, insight
     uv.ts                 kategori indeks UV + pengambilan Open-Meteo
     mars.ts               skoring MARS-5
@@ -154,6 +156,54 @@ lokasi sebelum sempat login dan menyetujui consent.
 
 ---
 
+## Ringkasan pra-kunjungan
+
+`src/lib/ringkasan.ts` + layar `/ringkasan` (dari tab **Tren**). Mengikuti
+kerangka tujuh bagian di Bagian 8 spesifikasi MVP, untuk periode **30 atau 90
+hari terakhir**. Tombol di bawah layar membagikan versi teks satu halaman
+(share sheet di ponsel, salin ke papan klip di web).
+
+Isi layar dan isi teks dirakit dari objek yang sama (`buatRingkasan()` →
+`ringkasanTeks()`), jadi keduanya tidak bisa berbeda. Perakitnya murni tanpa
+I/O — 36 test menutupi setiap aturan pengelompokan.
+
+**Yang dijaga:** ringkasan hanya merangkum apa yang pasien catat. Ia tidak
+menilai aktivitas penyakit, tidak menyebut flare sebagai kesimpulan, dan tidak
+pernah menyinggung dosis. Bagian "Indikator" berisi kalimat berangka
+(mis. "skor beban naik 4 check-in berturut-turut") — pengamatan, bukan pemicu
+tindakan. Satu-satunya jalur eskalasi tetap red-flag engine.
+
+**Penyimpangan yang disengaja dari naskah spesifikasi:**
+
+| Spesifikasi | Yang dibuat | Alasan |
+| --- | --- | --- |
+| "1. SKOR PRO" | "1. SKOR HARIAN (bukan PRO tervalidasi)" | PRO tervalidasi Bahasa Indonesia belum ada — lihat Bagian 7. Menyebut skala check-in sebagai "PRO" akan menyesatkan pembaca. |
+| "Efek samping dilaporkan" | Alasan bebas dari catatan minum obat + keterangan bahwa efek samping belum dikumpulkan terstruktur | Aplikasi belum punya field efek samping. |
+| "tindak lanjut pasien jika diketahui" | "tindak lanjut pasien belum tercatat" | Tidak ada data tindak lanjut sesudah peringatan red-flag. |
+| "7. PENGINGAT PEMANTAUAN (fase 2)" | Hanya fakta: tanggal lab terakhir, dan penanda bila pasien memakai hidroksiklorokuin | Jadwal skrining mata & lab rutin belum dipantau; memberi pengingat tanpa aturan yang direview akan jadi anjuran klinis. |
+
+**Ambang yang perlu direview reumatolog** (semuanya ambang *tampilan*, tidak
+memicu tindakan apa pun):
+
+- Gejala dikelompokkan **baru / makin sering / menetap / berkurang** dengan
+  membandingkan seberapa sering ia tercatat di paruh awal vs paruh akhir
+  periode. Ambang geser 0,25 (`AMBANG_GESER`).
+- Tren skor harian disebut naik/turun bila selisih rata-rata antar paruh ≥ 0,5.
+- "Skor beban harian" = kelelahan + nyeri sendi, definisi yang sama dengan
+  `memburukBeruntun` di layar Cek Flare.
+- Bila salah satu paruh tidak punya check-in sama sekali, gejala **tidak**
+  diklaim "baru" atau "berkurang" — dicatat netral sebagai "menetap", karena
+  tidak ada pembanding.
+
+**Privasi.** Teks memakai inisial + 8 karakter pertama ID pasien, bukan nama
+lengkap. Membagikan tetap berarti mengeluarkan data medis dari aplikasi, jadi
+ada peringatan tepat di atas tombolnya. Pertanyaan yang ditulis pasien untuk
+kunjungan disimpan **di perangkat saja** (AsyncStorage) — belum ada tabelnya di
+Supabase, jadi hilang bila aplikasi dihapus dan tidak ikut pindah antar
+perangkat.
+
+---
+
 ## Red-flag engine — bagian paling penting
 
 `src/lib/redflag.ts` mengimplementasikan Bagian 6 spesifikasi MVP. Keputusan
@@ -191,6 +241,8 @@ Sifat yang sengaja dipertahankan:
    laboratorium.
 5. **Ambang kategori MARS-5** (`src/lib/mars.ts`: Tinggi ≥ 23, Sedang ≥ 18) —
    cocokkan dengan rujukan yang dipakai di protokol penelitian.
+6. **Ambang tampilan ringkasan pra-kunjungan** (`src/lib/ringkasan.ts`) —
+   lihat daftarnya di bagian Ringkasan pra-kunjungan di atas.
 
 ---
 
@@ -228,7 +280,12 @@ menyetujui ulang. Ini syarat audit etik.
   Tabel `sledai_assessments`, `visits`, dan `alerts` sudah ada di skema tetapi
   belum dipakai. Pengguna dengan peran `doctor` saat ini masuk ke tampilan yang
   sama dengan pasien.
-- **Ringkasan pra-kunjungan** (Bagian 8 spesifikasi MVP).
+- **Efek samping obat terstruktur** — sekarang hanya ada alasan bebas di
+  catatan minum obat, sehingga bagian 4 ringkasan pra-kunjungan belum lengkap.
+- **Tindak lanjut sesudah peringatan red-flag** — tidak ada layar yang bertanya
+  "apa yang kamu lakukan setelah itu?", jadi bagian 5 ringkasan selalu berkata
+  belum tercatat.
+- **Sinkronisasi pertanyaan kunjungan** — kini hanya di perangkat pasien.
 - **Pengingat obat** & notifikasi.
 - **Ekspor CSV** untuk penelitian.
 - **PRO tervalidasi Bahasa Indonesia** (mis. Lupus Impact Tracker) — lihat

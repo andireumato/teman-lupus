@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
-import { useFocusEffect } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { Link, useFocusEffect } from 'expo-router';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import {
   Card,
@@ -208,6 +208,15 @@ export default function TrenScreen() {
         )}
       </Card>
 
+      <Link href="/ringkasan" asChild>
+        <Pressable style={styles.ringkasanCard}>
+          <Text style={styles.ringkasanJudul}>Ringkasan pra-kunjungan</Text>
+          <Text style={styles.ringkasanSub}>
+            Rangkuman catatanmu 30–90 hari terakhir untuk dibawa saat kontrol.
+          </Text>
+        </Pressable>
+      </Link>
+
       <Card>
         <SectionLabel>Akun</SectionLabel>
         <Text style={styles.akun}>
@@ -252,4 +261,14 @@ const styles = StyleSheet.create({
   badge: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3 },
   badgeText: { color: '#fff', fontSize: 11.5, fontWeight: '700' },
   akun: { fontSize: 13, color: Brand.teks },
+  ringkasanCard: {
+    backgroundColor: Brand.unguMuda,
+    borderWidth: 1,
+    borderColor: Brand.unguGaris,
+    borderRadius: radius.lg,
+    padding: space.lg,
+    gap: 4,
+  },
+  ringkasanJudul: { fontSize: 15, fontWeight: '700', color: Brand.ungu },
+  ringkasanSub: { fontSize: 12.5, color: '#5b5566', lineHeight: 18 },
 });

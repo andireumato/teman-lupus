@@ -60,6 +60,7 @@ function AuthGate() {
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="checkin" options={{ title: 'Check-in Harian' }} />
       <Stack.Screen name="mars" options={{ title: 'Kuesioner MARS-5' }} />
+      <Stack.Screen name="ringkasan" options={{ title: 'Ringkasan Pra-Kunjungan' }} />
     </Stack>
   );
 }
