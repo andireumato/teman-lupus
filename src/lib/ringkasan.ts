@@ -127,7 +127,21 @@ export interface Ringkasan {
    */
   perubahan: string[];
   obat: {
+    /** Data mentah per obat; dipertahankan agar bisa diaudit & diuji. */
     daftar: ObatTerlewat[];
+    /**
+     * Tiga kelompok berikut adalah bentuk siap-baca dari `daftar`, masing-masing
+     * menjawab satu pertanyaan: sedang minum apa, apa yang berubah, seberapa
+     * patuh. Dirakit di sini supaya layar dan versi teks tidak bisa berbeda.
+     */
+    sedangDiminum: { id: string; nama: string; frekuensi: number }[];
+    perubahan: { id: string; nama: string; teks: string }[];
+    dosis: {
+      diminum: number;
+      /** Diminum + terlewat. Penyebut yang jujur: hari tanpa catatan tidak ikut. */
+      tercatat: number;
+      terlewat: { id: string; nama: string; jumlah: number }[];
+    };
     /** Hari dalam periode tanpa satu pun catatan minum obat. */
     hariTanpaCatatan: number;
     mars: { tanggal: string; total: number; kategori: string } | null;
@@ -654,8 +668,23 @@ function ringkasObat(
       teks: `${namaObat.get(l.medication_id ?? '') ?? 'Obat'}: ${l.alasan!.trim()}`,
     }));
 
+  const urut = daftar.sort((a, b) => b.terlewat - a.terlewat || a.nama.localeCompare(b.nama));
+
   return {
-    daftar: daftar.sort((a, b) => b.terlewat - a.terlewat || a.nama.localeCompare(b.nama)),
+    daftar: urut,
+    sedangDiminum: urut
+      .filter((o) => o.aktif)
+      .map((o) => ({ id: o.id, nama: o.nama, frekuensi: o.frekuensi })),
+    perubahan: urut
+      .filter((o) => o.perubahan)
+      .map((o) => ({ id: o.id, nama: o.nama, teks: o.perubahan })),
+    dosis: {
+      diminum: urut.reduce((n, o) => n + o.diminum, 0),
+      tercatat: urut.reduce((n, o) => n + o.diminum + o.terlewat, 0),
+      terlewat: urut
+        .filter((o) => o.terlewat > 0)
+        .map((o) => ({ id: o.id, nama: o.nama, jumlah: o.terlewat })),
+    },
     hariTanpaCatatan: daftar.length === 0 ? 0 : Math.max(0, totalHari - hariTercatat),
     mars:
       marsTerakhir && marsTerakhir.total != null
@@ -812,26 +841,37 @@ export function ringkasanTeks(r: Ringkasan): string {
   // Sengaja padat: satu baris per obat, tanggal perubahan menempel pada
   // obatnya, dan tidak ada kalimat yang bercerita tentang aplikasi alih-alih
   // tentang pasien. Keterbatasan efek samping cukup disebut di judul.
-  b.push('4. OBAT (efek samping belum dicatat terstruktur)');
-  if (r.obat.daftar.length === 0) {
-    b.push('   - Belum ada obat terdaftar.');
-  } else {
-    for (const o of r.obat.daftar) {
-      const bagian = [`${o.diminum} diminum`, `${o.terlewat} terlewat`];
-      if (o.perubahan) bagian.push(o.perubahan);
-      b.push(`   - ${o.nama} (${o.frekuensi}x/hari): ${bagian.join(' · ')}`);
-    }
-    if (r.obat.hariTanpaCatatan > 0) {
-      b.push(
-        `   - ${r.obat.hariTanpaCatatan} dari ${r.kepala.jumlahHari} hari tanpa catatan minum obat`
-      );
-    }
-  }
+  // Dikelompokkan per pertanyaan, bukan per obat: tiap baris menjawab satu
+  // hal — sedang minum apa, apa yang berubah, seberapa patuh — sehingga
+  // jumlah barisnya tetap berapa pun banyaknya obat.
+  b.push('4. OBAT');
   b.push(
-    r.obat.mars
-      ? `   - MARS-5: ${r.obat.mars.total}/25 ${r.obat.mars.kategori} (${tanggalPendek(r.obat.mars.tanggal)})`
-      : '   - MARS-5: belum diisi'
+    r.obat.sedangDiminum.length === 0
+      ? '   - Sedang diminum: tidak ada obat aktif'
+      : `   - Sedang diminum: ${r.obat.sedangDiminum
+          .map((o) => `${o.nama} (${o.frekuensi}x/hari)`)
+          .join(', ')}`
   );
+  if (r.obat.perubahan.length > 0) {
+    b.push(`   - Perubahan: ${r.obat.perubahan.map((o) => `${o.nama} ${o.teks}`).join('; ')}`);
+  }
+  if (r.obat.dosis.tercatat > 0) {
+    const terlewat =
+      r.obat.dosis.terlewat.length > 0
+        ? `; terlewat: ${r.obat.dosis.terlewat.map((o) => `${o.nama} ${o.jumlah}`).join(', ')}`
+        : '';
+    b.push(
+      `   - Dosis diminum: ${r.obat.dosis.diminum} dari ${r.obat.dosis.tercatat} yang tercatat${terlewat}`
+    );
+  }
+  const mars = r.obat.mars
+    ? `MARS-5 ${r.obat.mars.total}/25 ${r.obat.mars.kategori} (${tanggalPendek(r.obat.mars.tanggal)})`
+    : 'MARS-5 belum diisi';
+  const kosong =
+    r.obat.hariTanpaCatatan > 0
+      ? ` · ${r.obat.hariTanpaCatatan} dari ${r.kepala.jumlahHari} hari tanpa catatan`
+      : '';
+  b.push(`   - ${mars}${kosong}`);
   for (const a of r.obat.alasan) {
     b.push(`   - Alasan: ${tanggalPendek(a.tanggal)} ${a.teks}`);
   }
@@ -868,7 +908,8 @@ export function ringkasanTeks(r: Ringkasan): string {
   b.push('');
 
   b.push(
-    'Ringkasan ini dibuat otomatis dari catatan pasien. Bukan penilaian aktivitas penyakit dan bukan alat diagnosis.'
+    'Ringkasan ini dibuat otomatis dari catatan pasien. Efek samping obat belum dikumpulkan ' +
+      'secara terstruktur. Bukan penilaian aktivitas penyakit dan bukan alat diagnosis.'
   );
 
   return b.join('\n');

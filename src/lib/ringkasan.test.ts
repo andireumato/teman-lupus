@@ -609,6 +609,47 @@ describe('kepatuhan obat', () => {
     expect(r.obat.daftar[0].aktif).toBe(false);
   });
 
+  it('mengelompokkan per pertanyaan: sedang diminum, berubah, kepatuhan', () => {
+    const r = buatRingkasan(
+      input({
+        meds: [
+          med('Metilprednisolon', 'ma', { frekuensi: 3 }),
+          med('Prednison', 'mb', { aktif: false }),
+        ],
+        medLogs: [
+          medLog({ tanggal: '2026-07-10', medication_id: 'ma', slot: 0, diminum: true }),
+          medLog({ tanggal: '2026-07-10', medication_id: 'ma', slot: 1, diminum: true }),
+          medLog({ tanggal: '2026-07-10', medication_id: 'mb', slot: 0, diminum: false }),
+        ],
+        medEvents: [medEvent('mb', 'stop', '2026-07-12', 'perut perih')],
+      })
+    );
+
+    // Obat yang dihentikan tidak masuk "sedang diminum"…
+    expect(r.obat.sedangDiminum.map((o) => o.nama)).toEqual(['Metilprednisolon']);
+    // …tetapi perubahannya tetap dilaporkan.
+    expect(r.obat.perubahan).toEqual([
+      { id: 'mb', nama: 'Prednison', teks: 'stop 12 Jul 2026 (perut perih)' },
+    ]);
+    // Penyebutnya dosis yang tercatat, bukan dosis yang seharusnya.
+    expect(r.obat.dosis).toEqual({
+      diminum: 2,
+      tercatat: 3,
+      terlewat: [{ id: 'mb', nama: 'Prednison', jumlah: 1 }],
+    });
+  });
+
+  it('obat tanpa dosis terlewat tidak disebut namanya', () => {
+    const r = buatRingkasan(
+      input({
+        meds: [med('Hidroksiklorokuin', 'mc')],
+        medLogs: [medLog({ tanggal: '2026-07-10', medication_id: 'mc', slot: 0, diminum: true })],
+      })
+    );
+    expect(r.obat.dosis.terlewat).toEqual([]);
+    expect(r.obat.perubahan).toEqual([]);
+  });
+
   it('dua obat bernama sama tetap dibedakan oleh id', () => {
     // Obat yang dihentikan lalu didaftarkan ulang dengan nama sama. Layar
     // ringkasan memakai id ini sebagai kunci React; memakai namanya membuat

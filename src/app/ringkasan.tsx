@@ -351,30 +351,35 @@ export default function RingkasanScreen() {
 
       <Card>
         <SectionLabel>4. Obat</SectionLabel>
-        <Text style={styles.catatanKecil}>Efek samping belum dicatat terstruktur.</Text>
-        {r.obat.daftar.length === 0 ? (
-          <Text style={styles.kosong}>Belum ada obat terdaftar.</Text>
-        ) : (
-          <>
-            {r.obat.daftar.map((o) => (
-              <Text key={o.id} style={styles.item}>
-                • {o.nama} <Text style={styles.lembut}>({o.frekuensi}x/hari)</Text>:{' '}
-                <Text style={styles.tebal}>{o.diminum}</Text> diminum · {o.terlewat} terlewat
-                {o.perubahan ? ` · ${o.perubahan}` : ''}
-              </Text>
-            ))}
-            {r.obat.hariTanpaCatatan > 0 && (
-              <Text style={styles.lembut}>
-                {r.obat.hariTanpaCatatan} dari {r.kepala.jumlahHari} hari tanpa catatan minum obat
-              </Text>
-            )}
-          </>
+        <Text style={styles.item}>
+          • <Text style={styles.tebal}>Sedang diminum:</Text>{' '}
+          {r.obat.sedangDiminum.length === 0
+            ? 'tidak ada obat aktif'
+            : r.obat.sedangDiminum.map((o) => `${o.nama} (${o.frekuensi}x/hari)`).join(', ')}
+        </Text>
+        {r.obat.perubahan.length > 0 && (
+          <Text style={styles.item}>
+            • <Text style={styles.tebal}>Perubahan:</Text>{' '}
+            {r.obat.perubahan.map((o) => `${o.nama} ${o.teks}`).join('; ')}
+          </Text>
+        )}
+        {r.obat.dosis.tercatat > 0 && (
+          <Text style={styles.item}>
+            • <Text style={styles.tebal}>Dosis diminum:</Text> {r.obat.dosis.diminum} dari{' '}
+            {r.obat.dosis.tercatat} yang tercatat
+            {r.obat.dosis.terlewat.length > 0
+              ? `; terlewat: ${r.obat.dosis.terlewat.map((o) => `${o.nama} ${o.jumlah}`).join(', ')}`
+              : ''}
+          </Text>
         )}
         <Text style={styles.item}>
-          • MARS-5:{' '}
+          •{' '}
           {r.obat.mars
-            ? `${r.obat.mars.total}/25 ${r.obat.mars.kategori} (${tanggalPendek(r.obat.mars.tanggal)})`
-            : 'belum diisi'}
+            ? `MARS-5 ${r.obat.mars.total}/25 ${r.obat.mars.kategori} (${tanggalPendek(r.obat.mars.tanggal)})`
+            : 'MARS-5 belum diisi'}
+          {r.obat.hariTanpaCatatan > 0
+            ? ` · ${r.obat.hariTanpaCatatan} dari ${r.kepala.jumlahHari} hari tanpa catatan`
+            : ''}
         </Text>
         {r.obat.alasan.map((a) => (
           <Text key={a.id} style={styles.item}>

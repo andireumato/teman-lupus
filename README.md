@@ -91,7 +91,7 @@ npm start                 # lalu tekan i (iOS) / a (Android), atau pindai QR den
 
 | Perintah            | Fungsi                                         |
 | ------------------- | ---------------------------------------------- |
-| `npm test`          | Unit test (red-flag, ringkasan, MARS-5, UV, beranda, tanggal) — 175 test |
+| `npm test`          | Unit test (red-flag, ringkasan, MARS-5, UV, beranda, tanggal) — 177 test |
 | `npm run typecheck` | Cek tipe TypeScript                            |
 | `npm run lint`      | ESLint + Prettier                              |
 | `npm run format`    | Rapikan format kode                            |
@@ -224,12 +224,31 @@ Bagian 4 ringkasan pra-kunjungan tetap melaporkan obat yang **sudah
 dihentikan** selama masih ada jejaknya pada periode itu — obat yang distop
 kemarin justru yang penting dibawa ke kontrol.
 
-Bagian itu sengaja dipadatkan: **satu baris per obat**, dan tanggal
-perubahannya menempel pada obatnya (`stop 12 Jul 2026, lanjut 20 Jul 2026`),
-bukan jadi daftar terpisah — pembaca butuh tahu obat *mana* yang berubah, bukan
-mengurutkan sendiri dua daftar. Keterbatasan "efek samping belum dicatat
-terstruktur" cukup disebut sekali di judul bagian, bukan sebagai baris
-tersendiri: ia bercerita tentang aplikasi, bukan tentang pasien.
+Bagian itu dikelompokkan **per pertanyaan, bukan per obat** — tiap baris
+menjawab satu hal, sehingga jumlah barisnya tetap berapa pun banyaknya obat:
+
+```
+4. OBAT
+   - Sedang diminum: Metilprednisolon (3x/hari), Hidroksiklorokuin (1x/hari)
+   - Perubahan: Prednison stop 12 Jul 2026 (perut perih), lanjut 20 Jul 2026
+   - Dosis diminum: 94 dari 96 yang tercatat; terlewat: Prednison 1
+   - MARS-5 22/25 Sedang (20 Jul 2026) · 8 dari 30 hari tanpa catatan
+```
+
+Dua bentuk sebelumnya ditolak saat ditinjau karena membingungkan: versi
+pertama satu baris per obat dengan hitungan dosis mentah plus daftar perubahan
+terpisah, versi kedua tetap per obat. Yang dipakai sekarang bentuk ketiga.
+
+Keputusan yang dijaga di sini: **penyebutnya "dosis yang tercatat"**, bukan
+dosis yang seharusnya. Persentase kepatuhan butuh penyebut "berapa dosis
+seharusnya diminum", dan dengan hari yang tidak dicatat penyebut itu jadi
+tebakan — angka 90% yang sebenarnya tidak diketahui lebih menyesatkan daripada
+dua angka mentah. Karena itu jumlah hari tanpa catatan disebut di baris yang
+sama dengan MARS-5.
+
+Nama obat hanya disebut pada baris "terlewat" bila obat itu memang punya dosis
+terlewat. Keterbatasan efek samping pindah ke kalimat penutup ringkasan: ia
+bercerita tentang aplikasi, bukan tentang pasien.
 
 ### Grafik di layar Tren
 
