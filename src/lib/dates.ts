@@ -4,6 +4,26 @@ export function todayISO(d: Date = new Date()): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
+/** Selisih hari antara dua tanggal YYYY-MM-DD (b − a). */
+export function selisihHari(a: string, b: string): number {
+  const ms = new Date(`${b}T00:00:00`).getTime() - new Date(`${a}T00:00:00`).getTime();
+  return Math.round(ms / 86_400_000);
+}
+
+/** Tanggal YYYY-MM-DD, n hari sebelum `iso`. */
+export function mundurHari(iso: string, n: number): string {
+  const d = new Date(`${iso}T00:00:00`);
+  d.setDate(d.getDate() - n);
+  return todayISO(d);
+}
+
+/** Deret tanggal berurutan `dari` → `sampai`, inklusif di kedua ujung. */
+export function deretHari(dari: string, sampai: string): string[] {
+  const n = selisihHari(dari, sampai);
+  if (n < 0) return [];
+  return Array.from({ length: n + 1 }, (_, i) => mundurHari(sampai, n - i));
+}
+
 const BULAN = [
   'Januari',
   'Februari',

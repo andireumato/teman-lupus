@@ -155,6 +155,10 @@ const WARNA_TINGKAT = [Brand.teksLembut, Brand.hijau, Brand.kuning, Brand.merah]
  * bukan seberapa "capek" rasanya, supaya penilaian pasien konsisten antar
  * hari dan antar pasien.
  *
+ * Kalimatnya diseragamkan dengan `SKALA_NYERI_SENDI`: sudut pandang pasien
+ * ("saya"), pola Terasa… → mengganggu, harus dikurangi → tidak bisa mengurus
+ * diri. Isinya tidak berubah, hanya suaranya.
+ *
  * Tingkat "Sangat berat" (nilai 4) DIHAPUS 27 Juli 2026: patokan "Berat" sudah
  * mencakup pasien yang sebagian besar harinya berbaring, jadi tidak ada ruang
  * bermakna di atasnya — dan tingkat tanpa patokan membuat data antar pasien
@@ -166,23 +170,28 @@ const WARNA_TINGKAT = [Brand.teksLembut, Brand.hijau, Brand.kuning, Brand.merah]
  * tersimpan ulang diam-diam) dan `BarChart` di `tren.tsx` (tinggi bar dibatasi).
  */
 export const SKALA_LELAH: OpsiSkala[] = [
-  { v: 0, label: 'Tidak ada', warna: WARNA_TINGKAT[0] },
+  {
+    v: 0,
+    label: 'Tidak ada',
+    ket: 'Tidak ada rasa lelah yang mengganggu sama sekali.',
+    warna: WARNA_TINGKAT[0],
+  },
   {
     v: 1,
     label: 'Ringan',
-    ket: 'Lelah, tapi hilang setelah istirahat; aktivitas harian normal tetap jalan.',
+    ket: 'Terasa lelah, tetapi hilang setelah istirahat; kegiatan sehari-hari tetap berjalan seperti biasa.',
     warna: WARNA_TINGKAT[1],
   },
   {
     v: 2,
     label: 'Sedang',
-    ket: 'Lelah tidak hilang dengan istirahat; pekerjaan rumah/kantor, belanja, atau ibadah jadi terganggu atau harus dikurangi.',
+    ket: 'Lelah tidak hilang meski sudah istirahat; saya harus mengurangi pekerjaan rumah/kantor, belanja, atau ibadah.',
     warna: WARNA_TINGKAT[2],
   },
   {
     v: 3,
     label: 'Berat',
-    ket: 'Lelah sampai kesulitan mengurus diri sendiri (mandi, berpakaian, makan); sebagian besar hari dihabiskan berbaring.',
+    ket: 'Lelah membuat saya kesulitan mengurus diri sendiri (mandi, berpakaian, makan); sebagian besar hari saya habiskan berbaring.',
     warna: WARNA_TINGKAT[3],
   },
 ];

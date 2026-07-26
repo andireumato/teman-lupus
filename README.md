@@ -66,7 +66,7 @@ npm start                 # lalu tekan i (iOS) / a (Android), atau pindai QR den
 
 | Perintah            | Fungsi                                         |
 | ------------------- | ---------------------------------------------- |
-| `npm test`          | Unit test (red-flag, ringkasan, MARS-5, UV, beranda, tanggal) — 154 test |
+| `npm test`          | Unit test (red-flag, ringkasan, MARS-5, UV, beranda, tanggal) — 168 test |
 | `npm run typecheck` | Cek tipe TypeScript                            |
 | `npm run lint`      | ESLint + Prettier                              |
 | `npm run format`    | Rapikan format kode                            |
@@ -98,10 +98,11 @@ src/
   lib/
     redflag.ts            red-flag engine [DETERMINISTIK]
     ringkasan.ts          perakit ringkasan pra-kunjungan + versi teksnya
+    grafik.ts             geometri grafik garis (murni, tanpa React)
     beranda.ts            salam, konten harian, tingkatan streak, insight
     uv.ts                 kategori indeks UV + pengambilan Open-Meteo
     mars.ts               skoring MARS-5
-    dates.ts              tanggal lokal & streak
+    dates.ts              tanggal lokal, selisih/mundur hari, deret & streak
     session.tsx           auth + profil + consent
     supabase.ts           klien Supabase
   constants/
@@ -172,6 +173,24 @@ aplikasi:
   meluber keluar kolomnya.
 - Hitungan di ringkasan memakai `≥`, jadi baris lama bernilai 4 tetap terhitung
   sebagai kelelahan berat.
+
+### Grafik di layar Tren
+
+Grafik garis, digambar tanpa dependensi apa pun: tiap ruas adalah `View` tipis
+yang diputar. `react-native-svg` tidak dipasang di proyek ini dan menambah
+pustaka grafik hanya untuk tiga garis kecil tidak sepadan.
+
+Dua hal yang sengaja dijaga, keduanya ditutup test di `src/lib/grafik.test.ts`:
+
+- **Sumbu X-nya hari kalender**, bukan urutan check-in. Dua titik yang terpaut
+  seminggu tidak boleh tampak berdampingan — alasan yang sama dengan hitungan
+  hari di bagian 3 ringkasan.
+- **Garis diputus pada hari yang tidak diisi.** Menyambungkannya berarti
+  mengarang nilai untuk hari yang pasien memang tidak mencatat apa pun. Ada
+  keterangan di bawah grafik yang menyebutkan ini.
+
+Geometrinya (`src/lib/grafik.ts`) dipisah dari komponennya supaya salah skala
+atau salah sudut ketahuan lewat test, bukan lewat memelototi layar.
 
 ### Catatan dua prototipe
 
@@ -260,8 +279,11 @@ memicu tindakan apa pun):
   membandingkan seberapa sering ia tercatat di paruh awal vs paruh akhir
   periode. Ambang geser 0,25 (`AMBANG_GESER`).
 - Tren skor harian disebut naik/turun bila selisih rata-rata antar paruh ≥ 0,5.
-- Ambang "menonjol" di bagian 3: nyeri sendi ≥ 2 (sedang–berat), kelelahan ≥ 3
-  (berat), mood ≤ 2 (buruk). Jendela pembandingnya 14 hari terakhir vs 14 hari
+- Ambang "menonjol" di bagian 3: nyeri sendi 2–3 (sedang–berat), kelelahan 3
+  (berat), mood 1–2 (buruk). Labelnya menyebut rentang **dan** skala aslinya
+  ("2–3 dari skala 0–3") alih-alih notasi "≥2", yang menuntut pembacanya tahu
+  dulu panjang skalanya. Rentang itu diturunkan dari ambang, jadi label tidak
+  bisa meleset ketika ambangnya diubah. Jendela pembandingnya 14 hari terakhir vs 14 hari
   sebelumnya — dipotong setengah periode bila periodenya lebih pendek.
 - Penyebut hitungan itu **hari yang tercatat**, bukan hari kalender, dan
   panjang jendelanya tetap disebut ("6 dari 7 hari yang tercatat (dalam 14 hari

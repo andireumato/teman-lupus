@@ -1,4 +1,12 @@
-import { hitungStreak, tanggalPanjang, tanggalPendek, todayISO } from './dates';
+import {
+  deretHari,
+  hitungStreak,
+  mundurHari,
+  selisihHari,
+  tanggalPanjang,
+  tanggalPendek,
+  todayISO,
+} from './dates';
 
 describe('todayISO', () => {
   it('memakai tanggal lokal, bukan UTC', () => {
@@ -55,5 +63,45 @@ describe('hitungStreak', () => {
 
   it('menyeberangi pergantian bulan', () => {
     expect(hitungStreak(['2026-08-01', '2026-07-31', '2026-07-30'], '2026-08-01')).toBe(3);
+  });
+});
+
+describe('selisihHari & mundurHari', () => {
+  it('selisihHari menghitung jarak antar tanggal', () => {
+    expect(selisihHari('2026-07-01', '2026-07-30')).toBe(29);
+    expect(selisihHari('2026-07-30', '2026-07-30')).toBe(0);
+    expect(selisihHari('2026-07-30', '2026-07-29')).toBe(-1);
+  });
+
+  it('mundurHari melintasi batas bulan & tahun', () => {
+    expect(mundurHari('2026-07-03', 5)).toBe('2026-06-28');
+    expect(mundurHari('2026-01-02', 3)).toBe('2025-12-30');
+  });
+
+  it('keduanya konsisten satu sama lain', () => {
+    expect(selisihHari(mundurHari('2026-03-15', 13), '2026-03-15')).toBe(13);
+  });
+});
+
+describe('deretHari', () => {
+  it('inklusif di kedua ujung dan urut lama → baru', () => {
+    expect(deretHari('2026-07-28', '2026-07-31')).toEqual([
+      '2026-07-28',
+      '2026-07-29',
+      '2026-07-30',
+      '2026-07-31',
+    ]);
+  });
+
+  it('satu hari bila kedua ujungnya sama', () => {
+    expect(deretHari('2026-07-31', '2026-07-31')).toEqual(['2026-07-31']);
+  });
+
+  it('kosong bila urutannya terbalik', () => {
+    expect(deretHari('2026-07-31', '2026-07-28')).toEqual([]);
+  });
+
+  it('melintasi batas bulan', () => {
+    expect(deretHari('2026-06-29', '2026-07-02')).toHaveLength(4);
   });
 });

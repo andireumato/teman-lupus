@@ -18,7 +18,7 @@
  */
 
 import { SISTEM_GEJALA } from '@/constants/lupus';
-import { tanggalPendek } from '@/lib/dates';
+import { mundurHari, selisihHari, tanggalPendek } from '@/lib/dates';
 import { PERTANYAAN_MENDESAK, PERTANYAAN_TANDA_BAHAYA } from '@/lib/redflag';
 import type {
   DailyCheckin,
@@ -133,20 +133,6 @@ const rata = (xs: number[]): number | null =>
 
 const bulat1 = (x: number) => Math.round(x * 10) / 10;
 const bulat2 = (x: number) => Math.round(x * 100) / 100;
-
-/** Selisih hari antara dua tanggal YYYY-MM-DD (b − a). */
-export function selisihHari(a: string, b: string): number {
-  const ms = new Date(`${b}T00:00:00`).getTime() - new Date(`${a}T00:00:00`).getTime();
-  return Math.round(ms / 86_400_000);
-}
-
-/** Tanggal YYYY-MM-DD, n hari sebelum `iso`. */
-export function mundurHari(iso: string, n: number): string {
-  const d = new Date(`${iso}T00:00:00`);
-  d.setDate(d.getDate() - n);
-  const pad = (x: number) => String(x).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
 
 /** Inisial dari nama lengkap: "Siti Rahma Dewi" → "S.R.D." */
 export function inisialNama(nama: string | null | undefined): string {
@@ -362,7 +348,9 @@ const AMBANG_NYERI = 2;
 /**
  * Kelelahan (skala 0–3): 3 = berat.
  * ⚠️ Ambang ini menghitung tingkat teratas saja, sementara nyeri sendi
- * menghitung dua tingkat teratas (sedang + berat) — belum tentu disengaja.
+ * menghitung dua tingkat teratas (sedang + berat). Sejak kedua skala punya
+ * patokan yang sepola — "Sedang" sama-sama berarti kegiatan harus dikurangi —
+ * perbedaan ini kemungkinan tidak disengaja dan menunggu keputusan reumatolog.
  */
 const AMBANG_LELAH = 3;
 /** Mood (skala 1–5): 1 = sangat buruk, 2 = buruk. */
@@ -375,25 +363,69 @@ const MIN_BERUNTUN = 3;
 const JARAK_BERSAMAAN = 7;
 
 interface Metrik {
-  label: string;
+  nama: string;
+  /** Batas skala aslinya, ikut disebut supaya angkanya bisa dibaca sendiri. */
+  min: number;
+  max: number;
+  ambang: number;
+  /** 'atas' = nilai ≥ ambang dihitung; 'bawah' = nilai ≤ ambang. */
+  arah: 'atas' | 'bawah';
   /** True bila nilai hari itu memenuhi ambang. */
   test: (r: DailyCheckin) => boolean;
 }
 
 const METRIK: Metrik[] = [
   {
-    label: `Nyeri sendi sedang–berat (≥${AMBANG_NYERI})`,
+    nama: 'Nyeri sendi sedang–berat',
+    min: 0,
+    max: 3,
+    ambang: AMBANG_NYERI,
+    arah: 'atas',
     test: (r) => r.nyeri_sendi != null && r.nyeri_sendi >= AMBANG_NYERI,
   },
   {
-    label: `Kelelahan berat (≥${AMBANG_LELAH})`,
+    nama: 'Kelelahan berat',
+    min: 0,
+    max: 3,
+    ambang: AMBANG_LELAH,
+    arah: 'atas',
     test: (r) => r.lelah != null && r.lelah >= AMBANG_LELAH,
   },
   {
-    label: `Mood buruk (≤${AMBANG_MOOD})`,
+    nama: 'Mood buruk',
+    min: 1,
+    max: 5,
+    ambang: AMBANG_MOOD,
+    arah: 'bawah',
     test: (r) => r.mood != null && r.mood <= AMBANG_MOOD,
   },
 ];
+
+/**
+ * "Nyeri sendi sedang–berat (2–3 dari skala 0–3)".
+ *
+ * Notasi "≥2" dibuang: pembacanya harus tahu dulu skalanya 0–3 untuk paham
+ * artinya. Rentangnya diturunkan dari ambang, jadi label tidak bisa meleset
+ * ketika ambangnya diubah.
+ */
+function rentangMetrik(m: Metrik): string {
+  const angka =
+    m.arah === 'atas'
+      ? m.ambang >= m.max
+        ? `${m.ambang}`
+        : `${m.ambang}–${m.max}`
+      : m.ambang <= m.min
+        ? `${m.ambang}`
+        : `${m.min}–${m.ambang}`;
+  return `${angka} dari skala ${m.min}–${m.max}`;
+}
+
+function labelMetrik(m: Metrik): string {
+  return `${m.nama} (${rentangMetrik(m)})`;
+}
+
+/** Metrik nyeri sendi, dipakai juga oleh kalimat "mulai memberat". */
+const METRIK_NYERI = METRIK[0];
 
 const dalam = (t: string, awal: string, akhir: string) => t >= awal && t <= akhir;
 
@@ -505,13 +537,13 @@ function perubahanTerkini(rows: DailyCheckin[], dari: string, sampai: string): s
         ? 'sebelumnya tidak ada catatan'
         : `sebelumnya ${lama} dari ${tercatatLama}`;
 
-    out.push(`${m.label}: ${sisiBaru}, ${sisiLama}.`);
+    out.push(`${labelMetrik(m)}: ${sisiBaru}, ${sisiLama}.`);
   }
 
   const rentetan = rentetanNyeri(rows);
   if (rentetan) {
     out.push(
-      `Mulai memberat sekitar ${tanggalPendek(rentetan.mulai)} — hari pertama dari ${rentetan.panjang} hari berturut-turut dengan nyeri sendi ≥${AMBANG_NYERI}.`
+      `Mulai memberat sekitar ${tanggalPendek(rentetan.mulai)} — hari pertama dari ${rentetan.panjang} hari berturut-turut dengan ${METRIK_NYERI.nama.toLowerCase()} (${rentangMetrik(METRIK_NYERI)}).`
     );
   }
 

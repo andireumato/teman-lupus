@@ -14,24 +14,45 @@ import {
 } from '@/components/ui/kit';
 import { Brand, radius, space } from '@/constants/brand';
 import { DISCLAIMER } from '@/constants/consent';
-import { hitungStreak, tanggalPendek } from '@/lib/dates';
+import { deretHari, hitungStreak, mundurHari, tanggalPendek, todayISO } from '@/lib/dates';
+import { ruasGrafik, titikGrafik } from '@/lib/grafik';
 import { useSession } from '@/lib/session';
 import { supabase } from '@/lib/supabase';
 import type { DailyCheckin, FlareCheck, MarsAssessment } from '@/types/database';
 
-/** Bar chart sederhana tanpa dependensi grafik. */
-function BarChart({
-  data,
+const TINGGI_GRAFIK = 96;
+const TITIK = 7;
+
+/**
+ * Grafik garis tanpa dependensi apa pun.
+ *
+ * Tiap ruas digambar sebagai `View` tipis yang diputar — react-native-svg
+ * tidak dipasang di proyek ini, dan menambah dependensi grafik hanya untuk
+ * tiga garis kecil tidak sepadan.
+ *
+ * Sumbu X-nya HARI KALENDER, bukan urutan check-in: dua titik yang terpaut
+ * seminggu tidak boleh tampak berdampingan. Karena itu pula garisnya
+ * diputus pada hari yang tidak diisi — menyambungkannya akan mengarang
+ * nilai untuk hari yang pasien memang tidak mencatat apa pun.
+ */
+function LineChart({
+  hari,
+  nilai,
   max,
   warna,
   label,
 }: {
-  data: { tanggal: string; nilai: number }[];
+  /** Semua tanggal pada sumbu X, urut lama → baru. */
+  hari: string[];
+  /** Nilai per tanggal; tanggal yang tidak ada berarti tidak ada check-in. */
+  nilai: Map<string, number>;
   max: number;
   warna: string;
   label: string;
 }) {
-  if (data.length === 0) {
+  const [lebar, setLebar] = useState(0);
+
+  if (nilai.size === 0) {
     return (
       <View>
         <Text style={styles.chartLabel}>{label}</Text>
@@ -40,29 +61,50 @@ function BarChart({
     );
   }
 
+  const titik = titikGrafik({ hari, nilai, max, lebar, tinggi: TINGGI_GRAFIK });
+  const ruas = ruasGrafik(titik);
+
   return (
     <View>
       <Text style={styles.chartLabel}>{label}</Text>
-      <View style={styles.chart}>
-        {data.map((d) => (
-          <View key={d.tanggal} style={styles.barKolom}>
-            <View style={styles.barTrack}>
+      <View
+        style={styles.grafik}
+        onLayout={(e) => setLebar(e.nativeEvent.layout.width)}
+        accessibilityRole="image"
+        accessibilityLabel={`${label}. ${titik.length} hari tercatat dari ${hari.length} hari.`}
+      >
+        {lebar > 0 && (
+          <>
+            {ruas.map((s) => (
               <View
+                key={s.key}
                 style={[
-                  styles.bar,
+                  styles.ruas,
                   {
-                    // Dibatasi 100%: baris lama bisa memakai skala yang sudah
-                    // dipendekkan (mis. kelelahan 4 sebelum "Sangat berat"
-                    // dihapus) dan akan meluber keluar kolomnya.
-                    height: `${Math.min(100, Math.max(4, (d.nilai / max) * 100))}%`,
+                    left: s.left,
+                    top: s.top,
+                    width: s.width,
                     backgroundColor: warna,
+                    transform: [{ rotateZ: s.sudut }],
                   },
                 ]}
               />
-            </View>
-            <Text style={styles.barLabel}>{d.tanggal.slice(8)}</Text>
-          </View>
-        ))}
+            ))}
+            {titik.map((p) => (
+              <View
+                key={p.tanggal}
+                style={[
+                  styles.titik,
+                  { left: p.x - TITIK / 2, top: p.y - TITIK / 2, borderColor: warna },
+                ]}
+              />
+            ))}
+          </>
+        )}
+      </View>
+      <View style={styles.sumbu}>
+        <Text style={styles.sumbuLabel}>{tanggalPendek(hari[0])}</Text>
+        <Text style={styles.sumbuLabel}>{tanggalPendek(hari[hari.length - 1])}</Text>
       </View>
     </View>
   );
@@ -133,18 +175,21 @@ export default function TrenScreen() {
   if (loading) return <Loading />;
 
   const streak = hitungStreak(checkins.map((c) => c.tanggal));
-  // 14 hari terakhir, urut lama → baru agar grafik dibaca kiri ke kanan.
-  const terakhir14 = [...checkins].reverse().slice(-14);
 
-  const dataMood = terakhir14
-    .filter((c) => c.mood != null)
-    .map((c) => ({ tanggal: c.tanggal, nilai: c.mood as number }));
-  const dataNyeri = terakhir14
-    .filter((c) => c.nyeri_sendi != null)
-    .map((c) => ({ tanggal: c.tanggal, nilai: c.nyeri_sendi as number }));
-  const dataLelah = terakhir14
-    .filter((c) => c.lelah != null)
-    .map((c) => ({ tanggal: c.tanggal, nilai: c.lelah as number }));
+  // Sumbu X = 14 hari kalender terakhir, urut lama → baru. Bukan "14 check-in
+  // terakhir": kalau pasien mengisi jarang, keduanya bisa terpaut berminggu.
+  const sampai = todayISO();
+  const hari = deretHari(mundurHari(sampai, 13), sampai);
+
+  const perHari = (ambil: (c: DailyCheckin) => number | null) => {
+    const m = new Map<string, number>();
+    for (const c of checkins) {
+      const v = ambil(c);
+      // checkins urut baru → lama, jadi entri pertama per tanggal yang menang.
+      if (v != null && !m.has(c.tanggal)) m.set(c.tanggal, v);
+    }
+    return m;
+  };
 
   return (
     <Screen>
@@ -169,9 +214,30 @@ export default function TrenScreen() {
 
       <Card>
         <SectionLabel>14 hari terakhir</SectionLabel>
-        <BarChart data={dataMood} max={5} warna={Brand.ungu} label="Mood (1–5)" />
-        <BarChart data={dataLelah} max={3} warna={Brand.kuning} label="Kelelahan (0–3)" />
-        <BarChart data={dataNyeri} max={3} warna={Brand.merah} label="Nyeri sendi (0–3)" />
+        <LineChart
+          hari={hari}
+          nilai={perHari((c) => c.mood)}
+          max={5}
+          warna={Brand.ungu}
+          label="Mood (1–5)"
+        />
+        <LineChart
+          hari={hari}
+          nilai={perHari((c) => c.lelah)}
+          max={3}
+          warna={Brand.kuning}
+          label="Kelelahan (0–3)"
+        />
+        <LineChart
+          hari={hari}
+          nilai={perHari((c) => c.nyeri_sendi)}
+          max={3}
+          warna={Brand.merah}
+          label="Nyeri sendi (0–3)"
+        />
+        <Text style={styles.chartCatatan}>
+          Garis terputus pada hari yang tidak kamu isi — bukan berarti tidak ada keluhan.
+        </Text>
       </Card>
 
       <Card>
@@ -245,11 +311,30 @@ const styles = StyleSheet.create({
   statAngka: { fontSize: 24, fontWeight: '800', color: Brand.ungu },
   statLabel: { fontSize: 11.5, color: Brand.teksLembut },
   chartLabel: { fontSize: 12.5, fontWeight: '700', color: '#4b5563', marginTop: space.sm },
-  chart: { flexDirection: 'row', alignItems: 'flex-end', gap: 3, height: 90, marginTop: 6 },
-  barKolom: { flex: 1, alignItems: 'center', gap: 3 },
-  barTrack: { flex: 1, width: '100%', justifyContent: 'flex-end' },
-  bar: { width: '100%', borderRadius: 3 },
-  barLabel: { fontSize: 9, color: Brand.teksLembut },
+  grafik: {
+    height: TINGGI_GRAFIK,
+    marginTop: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+  },
+  ruas: {
+    position: 'absolute',
+    height: 2,
+    borderRadius: 1,
+    // Titik putarnya di ujung kiri ruas, bukan tengahnya.
+    transformOrigin: 'left center',
+  },
+  titik: {
+    position: 'absolute',
+    width: TITIK,
+    height: TITIK,
+    borderRadius: TITIK / 2,
+    borderWidth: 2,
+    backgroundColor: '#fff',
+  },
+  sumbu: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 3 },
+  sumbuLabel: { fontSize: 9.5, color: Brand.teksLembut },
+  chartCatatan: { fontSize: 11, color: Brand.teksLembut, lineHeight: 16, marginTop: space.xs },
   kosong: { fontSize: 12.5, color: Brand.teksLembut, paddingVertical: 4 },
   baris: {
     flexDirection: 'row',

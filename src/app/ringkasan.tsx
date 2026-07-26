@@ -18,12 +18,11 @@ import {
 } from '@/components/ui/kit';
 import { Brand, space } from '@/constants/brand';
 import { DISCLAIMER } from '@/constants/consent';
-import { tanggalPendek, todayISO } from '@/lib/dates';
+import { mundurHari, tanggalPendek, todayISO } from '@/lib/dates';
 import {
   buatRingkasan,
   idPendek,
   inisialNama,
-  mundurHari,
   ringkasanTeks,
   type GejalaRingkas,
   type Ringkasan,
