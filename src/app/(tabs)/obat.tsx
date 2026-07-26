@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useCallback, useState } from 'react';
 import { Link, useFocusEffect } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import {
   Card,
@@ -58,6 +58,9 @@ export default function ObatScreen() {
   const [dosis, setDosis] = useState('');
   const [jadwal, setJadwal] = useState('');
   const [frekuensi, setFrekuensi] = useState(1);
+  /** id obat yang sedang ditanyai alasan berhentinya. */
+  const [hentikanId, setHentikanId] = useState<string | null>(null);
+  const [alasanHenti, setAlasanHenti] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -108,6 +111,11 @@ export default function ObatScreen() {
       void muat();
     }, [muat])
   );
+
+  /** Berapa catatan dosis hari ini yang akan ikut terhapus. */
+  function jumlahCatatan(medId: string): number {
+    return Object.values(logs).filter((l) => l.medication_id === medId).length;
+  }
 
   /** Tanggal berhenti terakhir sebuah obat, untuk daftar obat lama. */
   function tanggalBerhenti(medId: string): string | null {
@@ -205,7 +213,7 @@ export default function ObatScreen() {
    * aktif dan pindah ke daftar "pernah diminum", plus satu event bertanggal
    * supaya ringkasan pra-kunjungan bisa menyebutkannya.
    */
-  async function hentikan(med: Medication) {
+  async function hentikan(med: Medication, alasan: string) {
     if (!patientId) return;
     const { error } = await supabase.from('medications').update({ aktif: false }).eq('id', med.id);
     if (error) {
@@ -217,10 +225,54 @@ export default function ObatScreen() {
       medication_id: med.id,
       jenis: 'stop',
       tanggal: hariIni,
+      catatan: alasan.trim() || null,
     });
     if (ee)
       setErr(pesanSkemaObat(`Obat dihentikan, tetapi tanggalnya gagal dicatat: ${ee.message}`));
+    setHentikanId(null);
+    setAlasanHenti('');
     await muat();
+  }
+
+  /**
+   * Menghapus obat BERBEDA dari menghentikannya: seluruh jejaknya ikut hilang,
+   * termasuk catatan dosis dan riwayat berhenti/lanjut. Disediakan untuk obat
+   * yang salah dimasukkan — bukan untuk obat yang memang pernah diminum, yang
+   * seharusnya dihentikan supaya riwayatnya terbawa ke ringkasan.
+   *
+   * `med_logs` dihapus lebih dulu dan eksplisit: foreign key-nya
+   * `on delete set null`, jadi tanpa ini barisnya tertinggal tanpa induk dan
+   * hitungan kepatuhan diam-diam berkurang tanpa jejak obatnya.
+   */
+  async function hapus(med: Medication) {
+    if (!patientId) return;
+
+    const { error: el } = await supabase.from('med_logs').delete().eq('medication_id', med.id);
+    if (el) {
+      setErr(`Gagal menghapus catatan dosisnya: ${el.message}`);
+      return;
+    }
+    // medication_events ikut terhapus lewat cascade.
+    const { error } = await supabase.from('medications').delete().eq('id', med.id);
+    if (error) {
+      setErr(`Gagal menghapus obat: ${error.message}`);
+      return;
+    }
+    await muat();
+  }
+
+  function konfirmasiHapus(med: Medication) {
+    const n = jumlahCatatan(med.id);
+    Alert.alert(
+      `Hapus ${med.nama_obat}?`,
+      n > 0
+        ? `${n} catatan dosis hari ini dan seluruh riwayatnya ikut terhapus dan tidak bisa dikembalikan.\n\nKalau obat ini memang pernah diminum, pilih "Hentikan" saja — riwayatnya tetap terbawa ke ringkasan pra-kunjungan.`
+        : 'Obat ini akan dihapus beserta seluruh riwayatnya dan tidak bisa dikembalikan.',
+      [
+        { text: 'Batal', style: 'cancel' },
+        { text: 'Hapus', style: 'destructive', onPress: () => void hapus(med) },
+      ]
+    );
   }
 
   async function lanjutkan(med: Medication) {
@@ -284,10 +336,53 @@ export default function ObatScreen() {
                   {[m.dosis, `${n}x sehari`, m.jadwal].filter(Boolean).join(' · ')}
                 </Text>
               </View>
-              <Pressable onPress={() => void hentikan(m)} hitSlop={8}>
-                <Text style={styles.hapus}>Hentikan</Text>
-              </Pressable>
+              <View style={styles.aksiKanan}>
+                <Pressable
+                  onPress={() => {
+                    setHentikanId(hentikanId === m.id ? null : m.id);
+                    setAlasanHenti('');
+                  }}
+                  hitSlop={8}
+                >
+                  <Text style={styles.hentikan}>Hentikan</Text>
+                </Pressable>
+                <Pressable onPress={() => konfirmasiHapus(m)} hitSlop={8}>
+                  <Text style={styles.hapus}>Hapus</Text>
+                </Pressable>
+              </View>
             </View>
+
+            {hentikanId === m.id && (
+              <View style={styles.formHenti}>
+                <Field
+                  label="Alasan berhenti (opsional)"
+                  value={alasanHenti}
+                  onChangeText={setAlasanHenti}
+                  placeholder="mis. mual, atau dihentikan dokter"
+                  onSubmitEditing={() => void hentikan(m, alasanHenti)}
+                  returnKeyType="done"
+                />
+                <Text style={styles.hint}>
+                  Alasannya ikut tercatat di ringkasan pra-kunjungan beserta tanggalnya.
+                </Text>
+                <View style={styles.aksi}>
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => void hentikan(m, alasanHenti)}
+                    style={[styles.tombolKecil, styles.tombolHenti]}
+                  >
+                    <Text style={styles.tombolHentiText}>Hentikan obat ini</Text>
+                  </Pressable>
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => setHentikanId(null)}
+                    style={styles.tombolKecil}
+                  >
+                    <Text style={styles.tombolKecilText}>Batal</Text>
+                  </Pressable>
+                </View>
+              </View>
+            )}
 
             {/*
               Satu baris centang per dosis: obat 3x sehari perlu tiga tanda.
@@ -368,9 +463,14 @@ export default function ObatScreen() {
                     {tgl ? ` · berhenti ${tanggalPendek(tgl)}` : ''}
                   </Text>
                 </View>
-                <Pressable onPress={() => void lanjutkan(m)} hitSlop={8}>
-                  <Text style={styles.lanjut}>Lanjutkan</Text>
-                </Pressable>
+                <View style={styles.aksiKanan}>
+                  <Pressable onPress={() => void lanjutkan(m)} hitSlop={8}>
+                    <Text style={styles.lanjut}>Lanjutkan</Text>
+                  </Pressable>
+                  <Pressable onPress={() => konfirmasiHapus(m)} hitSlop={8}>
+                    <Text style={styles.hapus}>Hapus</Text>
+                  </Pressable>
+                </View>
               </View>
             );
           })}
@@ -399,7 +499,33 @@ const styles = StyleSheet.create({
   medInfo: { flex: 1 },
   medNama: { fontSize: 15, fontWeight: '700', color: Brand.teks },
   medMeta: { fontSize: 12.5, color: Brand.teksLembut, marginTop: 2 },
+  hentikan: { fontSize: 12, color: Brand.kuning, fontWeight: '600' },
   hapus: { fontSize: 12, color: Brand.merah, fontWeight: '600' },
+  aksiKanan: { alignItems: 'flex-end', gap: 6 },
+  aksi: { flexDirection: 'row', gap: space.sm },
+  formHenti: {
+    gap: 6,
+    marginTop: space.xs,
+    padding: space.md,
+    borderRadius: radius.md,
+    backgroundColor: Brand.kuningMuda,
+    borderWidth: 1,
+    borderColor: '#fde68a',
+  },
+  tombolKecil: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: radius.md,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+    minHeight: 44,
+  },
+  tombolKecilText: { fontSize: 13, fontWeight: '600', color: '#374151' },
+  tombolHenti: { backgroundColor: Brand.kuning, borderColor: Brand.kuning },
+  tombolHentiText: { fontSize: 13, fontWeight: '700', color: '#fff' },
   lanjut: { fontSize: 12, color: Brand.ungu, fontWeight: '700' },
   dosisBaris: {
     flexDirection: 'row',
