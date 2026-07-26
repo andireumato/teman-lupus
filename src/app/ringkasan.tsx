@@ -356,7 +356,7 @@ export default function RingkasanScreen() {
         ) : (
           <>
             {r.obat.daftar.map((o) => (
-              <Text key={o.nama} style={styles.item}>
+              <Text key={o.id} style={styles.item}>
                 • {o.nama}{' '}
                 <Text style={styles.lembut}>
                   ({o.frekuensi}x sehari{o.aktif ? '' : ', sudah dihentikan'})
@@ -377,7 +377,7 @@ export default function RingkasanScreen() {
             : 'belum diisi pada periode ini'}
         </Text>
         {r.obat.alasan.map((a) => (
-          <Text key={`${a.tanggal}|${a.teks}`} style={styles.item}>
+          <Text key={a.id} style={styles.item}>
             • {tanggalPendek(a.tanggal)}: {a.teks}
           </Text>
         ))}
@@ -385,7 +385,7 @@ export default function RingkasanScreen() {
           <View style={styles.grup}>
             <Text style={styles.grupJudul}>Perubahan obat</Text>
             {r.obat.riwayat.map((h) => (
-              <Text key={`${h.tanggal}|${h.teks}`} style={styles.item}>
+              <Text key={h.id} style={styles.item}>
                 • {tanggalPendek(h.tanggal)}: {h.teks}
               </Text>
             ))}
@@ -402,7 +402,7 @@ export default function RingkasanScreen() {
           <Text style={styles.kosong}>Tidak ada peringatan pada periode ini.</Text>
         ) : (
           r.redflag.map((e) => (
-            <View key={e.waktu} style={styles.event}>
+            <View key={e.id} style={styles.event}>
               <View style={styles.eventHead}>
                 <Text style={styles.eventTanggal}>{tanggalPendek(e.waktu)}</Text>
                 <View

@@ -91,7 +91,7 @@ npm start                 # lalu tekan i (iOS) / a (Android), atau pindai QR den
 
 | Perintah            | Fungsi                                         |
 | ------------------- | ---------------------------------------------- |
-| `npm test`          | Unit test (red-flag, ringkasan, MARS-5, UV, beranda, tanggal) — 173 test |
+| `npm test`          | Unit test (red-flag, ringkasan, MARS-5, UV, beranda, tanggal) — 175 test |
 | `npm run typecheck` | Cek tipe TypeScript                            |
 | `npm run lint`      | ESLint + Prettier                              |
 | `npm run format`    | Rapikan format kode                            |

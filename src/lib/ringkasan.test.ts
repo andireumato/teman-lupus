@@ -541,7 +541,7 @@ describe('kepatuhan obat', () => {
       })
     );
     expect(r.obat.daftar).toEqual([
-      { nama: 'Hidroksiklorokuin', frekuensi: 1, aktif: true, terlewat: 2, diminum: 1 },
+      { id: 'm1', nama: 'Hidroksiklorokuin', frekuensi: 1, aktif: true, terlewat: 2, diminum: 1 },
     ]);
     expect(r.obat.hariTanpaCatatan).toBe(27);
   });
@@ -566,6 +566,7 @@ describe('kepatuhan obat', () => {
       })
     );
     expect(r.obat.daftar[0]).toEqual({
+      id: 'm3',
       nama: 'Metilprednisolon',
       frekuensi: 3,
       aktif: true,
@@ -584,10 +585,13 @@ describe('kepatuhan obat', () => {
         ],
       })
     );
-    expect(r.obat.riwayat).toEqual([
+    // id-nya id baris event; yang diuji di sini isinya.
+    expect(r.obat.riwayat.map(({ tanggal, teks }) => ({ tanggal, teks }))).toEqual([
       { tanggal: '2026-07-12', teks: 'Berhenti Prednison — perut perih' },
       { tanggal: '2026-07-20', teks: 'Dilanjutkan lagi Prednison' },
     ]);
+    // Kunci React di layar memakai id ini, jadi harus ada & berbeda.
+    expect(new Set(r.obat.riwayat.map((h) => h.id)).size).toBe(2);
   });
 
   it('obat yang dihentikan tetap dilaporkan bila ada jejaknya di periode ini', () => {
@@ -599,6 +603,21 @@ describe('kepatuhan obat', () => {
     );
     expect(r.obat.daftar).toHaveLength(1);
     expect(r.obat.daftar[0].aktif).toBe(false);
+  });
+
+  it('dua obat bernama sama tetap dibedakan oleh id', () => {
+    // Obat yang dihentikan lalu didaftarkan ulang dengan nama sama. Layar
+    // ringkasan memakai id ini sebagai kunci React; memakai namanya membuat
+    // React menemukan dua anak dengan kunci sama.
+    const r = buatRingkasan(
+      input({
+        meds: [med('Myfortic', 'm7', { aktif: false }), med('Myfortic', 'm8')],
+        medEvents: [medEvent('m7', 'stop', '2026-07-10'), medEvent('m8', 'mulai', '2026-07-10')],
+      })
+    );
+    expect(r.obat.daftar).toHaveLength(2);
+    expect(new Set(r.obat.daftar.map((o) => o.id)).size).toBe(2);
+    expect(new Set(r.obat.riwayat.map((h) => h.id)).size).toBe(2);
   });
 
   it('obat lama tanpa jejak di periode ini tidak ikut dilaporkan', () => {
@@ -646,7 +665,7 @@ describe('kepatuhan obat', () => {
         ],
       })
     );
-    expect(r.obat.alasan).toEqual([
+    expect(r.obat.alasan.map(({ tanggal, teks }) => ({ tanggal, teks }))).toEqual([
       { tanggal: '2026-07-09', teks: 'Metilprednisolon: perut perih' },
     ]);
   });
@@ -680,6 +699,18 @@ describe('event red-flag', () => {
       })
     );
     expect(r.redflag[0].tanda).toEqual(['Kejang', 'Urin berbusa']);
+  });
+
+  it('dua event pada waktu sama tetap dibedakan oleh id', () => {
+    const r = buatRingkasan(
+      input({
+        flares: [
+          flare('2026-07-05T10:00:00+07:00', 'red'),
+          flare('2026-07-05T10:00:00+07:00', 'yellow'),
+        ],
+      })
+    );
+    expect(new Set(r.redflag.map((e) => e.id)).size).toBe(2);
   });
 
   it('event di luar periode diabaikan', () => {

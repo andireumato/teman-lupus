@@ -80,6 +80,8 @@ export interface GejalaRingkas {
 }
 
 export interface ObatTerlewat {
+  /** id baris `medications` — dua obat bisa punya nama sama. */
+  id: string;
   nama: string;
   /** Berapa kali diminum per hari. */
   frekuensi: number;
@@ -92,6 +94,7 @@ export interface ObatTerlewat {
 }
 
 export interface EventRedFlag {
+  id: string;
   waktu: string;
   level: 'darurat' | 'mendesak';
   /** Label bahasa awam dari tanda yang dicentang pasien. */
@@ -122,9 +125,9 @@ export interface Ringkasan {
     hariTanpaCatatan: number;
     mars: { tanggal: string; total: number; kategori: string } | null;
     /** Alasan bebas yang ditulis pasien di catatan minum obat. */
-    alasan: { tanggal: string; teks: string }[];
+    alasan: { id: string; tanggal: string; teks: string }[];
     /** Obat yang mulai, dihentikan, atau dilanjutkan pada periode ini. */
-    riwayat: { tanggal: string; teks: string }[];
+    riwayat: { id: string; tanggal: string; teks: string }[];
   };
   redflag: EventRedFlag[];
   pertanyaan: {
@@ -598,6 +601,7 @@ function ringkasObat(
     .sort((a, b) => a.tanggal.localeCompare(b.tanggal));
 
   const riwayat = eventPeriode.map((e) => ({
+    id: e.id,
     tanggal: e.tanggal,
     teks: `${KATA_EVENT[e.jenis]} ${namaObat.get(e.medication_id) ?? 'obat'}${
       e.catatan ? ` — ${e.catatan.trim()}` : ''
@@ -616,6 +620,7 @@ function ringkasObat(
     .map((m) => {
       const milik = dalamPeriode.filter((l) => l.medication_id === m.id);
       return {
+        id: m.id,
         nama: m.nama_obat,
         frekuensi: m.frekuensi ?? 1,
         aktif: m.aktif,
@@ -635,6 +640,7 @@ function ringkasObat(
     .filter((l) => (l.alasan ?? '').trim().length > 0)
     .sort((a, b) => a.tanggal.localeCompare(b.tanggal))
     .map((l) => ({
+      id: l.id,
       tanggal: l.tanggal,
       teks: `${namaObat.get(l.medication_id ?? '') ?? 'Obat'}: ${l.alasan!.trim()}`,
     }));
@@ -672,6 +678,7 @@ function eventRedFlag(flares: FlareCheck[], dari: string, sampai: string): Event
           .map(([k]) => LABEL_TANDA.get(k) ?? k)
       );
       return {
+        id: f.id,
         waktu: f.waktu,
         level: f.hasil === 'red' ? ('darurat' as const) : ('mendesak' as const),
         tanda: dicentang,
