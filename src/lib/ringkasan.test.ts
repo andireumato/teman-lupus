@@ -76,7 +76,7 @@ function medLog(p: Partial<MedLog> & { tanggal: string }): MedLog {
     id: id(),
     patient_id: 'p1',
     medication_id: null,
-    dosis_ke: 1,
+    slot: 0,
     diminum: null,
     alasan: null,
     created_at: `${p.tanggal}T08:00:00+07:00`,
@@ -559,9 +559,9 @@ describe('kepatuhan obat', () => {
       input({
         meds: [m],
         medLogs: [
-          medLog({ tanggal: '2026-07-10', medication_id: 'm3', dosis_ke: 1, diminum: true }),
-          medLog({ tanggal: '2026-07-10', medication_id: 'm3', dosis_ke: 2, diminum: true }),
-          medLog({ tanggal: '2026-07-10', medication_id: 'm3', dosis_ke: 3, diminum: false }),
+          medLog({ tanggal: '2026-07-10', medication_id: 'm3', slot: 0, diminum: true }),
+          medLog({ tanggal: '2026-07-10', medication_id: 'm3', slot: 1, diminum: true }),
+          medLog({ tanggal: '2026-07-10', medication_id: 'm3', slot: 2, diminum: false }),
         ],
       })
     );

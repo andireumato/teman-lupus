@@ -31,12 +31,15 @@ const FREKUENSI = [
   { v: 4, label: '4x sehari' },
 ];
 
-/** Kunci catatan satu dosis pada satu hari. */
-const kunciDosis = (medicationId: string, dosisKe: number) => `${medicationId}|${dosisKe}`;
+/**
+ * Kunci catatan satu dosis pada satu hari.
+ * `slot` dihitung dari 0 — lihat catatan di `MedLog.slot`.
+ */
+const kunciDosis = (medicationId: string, slot: number) => `${medicationId}|${slot}`;
 
 /** Tabel/kolom baru belum tentu ada di project Supabase lama. */
 function pesanSkemaObat(pesan: string): string {
-  return /frekuensi|dosis_ke|medication_events/.test(pesan)
+  return /frekuensi|slot|medication_events/.test(pesan)
     ? 'Skema obat di Supabase belum diperbarui. Jalankan supabase/obat_frekuensi_dan_riwayat.sql di SQL Editor.'
     : pesan;
 }
@@ -94,7 +97,7 @@ export default function ObatScreen() {
 
     const map: Record<string, MedLog> = {};
     for (const row of (l ?? []) as MedLog[]) {
-      if (row.medication_id) map[kunciDosis(row.medication_id, row.dosis_ke ?? 1)] = row;
+      if (row.medication_id) map[kunciDosis(row.medication_id, row.slot ?? 0)] = row;
     }
     setLogs(map);
     setLoading(false);
@@ -120,18 +123,18 @@ export default function ObatScreen() {
    * berturut-turut, tombolnya jadi terasa mati. Keadaan di layar sudah benar
    * dari pembaruan optimistis; jaringan hanya perlu menyusul.
    */
-  async function tandai(med: Medication, dosisKe: number, diminum: boolean) {
+  async function tandai(med: Medication, slot: number, diminum: boolean) {
     if (!patientId) return;
     setErr(null);
 
-    const k = kunciDosis(med.id, dosisKe);
+    const k = kunciDosis(med.id, slot);
     const sebelumnya = logs;
     setLogs((prev) => ({
       ...prev,
       [k]: {
         ...(prev[k] ?? ({} as MedLog)),
         medication_id: med.id,
-        dosis_ke: dosisKe,
+        slot,
         diminum,
       } as MedLog,
     }));
@@ -141,10 +144,11 @@ export default function ObatScreen() {
         patient_id: patientId,
         medication_id: med.id,
         tanggal: hariIni,
-        dosis_ke: dosisKe,
+        slot,
         diminum,
       },
-      { onConflict: 'patient_id,medication_id,tanggal,dosis_ke' }
+      // Cocok dengan unique index `med_logs_unik_slot` yang sudah ada.
+      { onConflict: 'medication_id,tanggal,slot' }
     );
 
     if (error) {
@@ -245,8 +249,8 @@ export default function ObatScreen() {
   const sudah = meds.reduce(
     (n, m) =>
       n +
-      Array.from({ length: m.frekuensi ?? 1 }, (_, i) => i + 1).filter(
-        (d) => logs[kunciDosis(m.id, d)]?.diminum === true
+      Array.from({ length: m.frekuensi ?? 1 }, (_, i) => i).filter(
+        (slot) => logs[kunciDosis(m.id, slot)]?.diminum === true
       ).length,
     0
   );
@@ -290,18 +294,18 @@ export default function ObatScreen() {
               Seluruh barisnya yang bisa diketuk, bukan kotak kecilnya saja —
               sasaran ketuk setinggi 44pt, sesuai baris obat lain.
             */}
-            {Array.from({ length: n }, (_, i) => i + 1).map((dosisKe) => {
-              const log = logs[kunciDosis(m.id, dosisKe)];
+            {Array.from({ length: n }, (_, i) => i).map((slot) => {
+              const log = logs[kunciDosis(m.id, slot)];
               const sudah = log?.diminum === true;
               return (
                 <Pressable
-                  key={dosisKe}
+                  key={slot}
                   accessibilityRole="checkbox"
                   accessibilityState={{ checked: sudah }}
                   accessibilityLabel={
-                    n > 1 ? `${m.nama_obat} dosis ke-${dosisKe}` : `${m.nama_obat} sudah diminum`
+                    n > 1 ? `${m.nama_obat} dosis ke-${slot + 1}` : `${m.nama_obat} sudah diminum`
                   }
-                  onPress={() => void tandai(m, dosisKe, !sudah)}
+                  onPress={() => void tandai(m, slot, !sudah)}
                   style={({ pressed }) => [
                     styles.dosisBaris,
                     sudah && styles.dosisBarisOn,
@@ -312,7 +316,7 @@ export default function ObatScreen() {
                     {sudah && <Ionicons name="checkmark" size={15} color="#fff" />}
                   </View>
                   <Text style={[styles.dosisLabel, sudah && styles.dosisLabelOn]}>
-                    {n > 1 ? `Dosis ke-${dosisKe}` : 'Sudah diminum hari ini'}
+                    {n > 1 ? `Dosis ke-${slot + 1}` : 'Sudah diminum hari ini'}
                   </Text>
                   {log?.diminum === false && <Text style={styles.belum}>ditandai belum</Text>}
                 </Pressable>

@@ -39,17 +39,28 @@ layar ringkasan menampilkan pesan yang menyebut nama file SQL-nya, sementara
 enam bagian ringkasan lain tetap jalan.
 
 Skema obat diperbarui 27 Juli 2026 lewat Dashboard SQL Editor dengan isi
-`supabase/obat_frekuensi_dan_riwayat.sql`: kolom `medications.frekuensi`,
-`med_logs.dosis_ke`, unique index `(patient_id, medication_id, tanggal,
-dosis_ke)`, dan tabel `medication_events`. Diverifikasi lewat REST: ketiganya
-terbaca (HTTP 200) dan RLS `medication_events` aktif (insert tanpa login
-ditolak `42501`).
+`supabase/obat_frekuensi_dan_riwayat.sql`: kolom `medications.frekuensi` dan
+tabel `medication_events`. Diverifikasi lewat REST: keduanya terbaca (HTTP 200)
+dan RLS `medication_events` aktif (insert tanpa login ditolak `42501`).
 
-Pemasangan unique index-nya **gagal pada percobaan pertama**: ada 3 pasang baris
-`med_logs` kembar — nilainya identik, dibuat selisih milidetik oleh kode lama
-yang memeriksa-lalu-menyisipkan, sehingga dua ketukan cepat lolos pemeriksaan.
-Persis masalah yang hendak dicegah index ini. Baris yang lebih tua dari tiap
-pasangan dihapus (21 → 18 baris) atas persetujuan, lalu skrip dijalankan ulang.
+Dua kejadian di sepanjang migrasi ini yang layak diingat:
+
+**Baris kembar.** Pemasangan unique index gagal pada percobaan pertama: ada 3
+pasang baris `med_logs` kembar — nilainya identik, dibuat selisih milidetik
+oleh kode lama yang memeriksa-lalu-menyisipkan, sehingga dua ketukan cepat
+lolos pemeriksaan. Persis masalah yang hendak dicegah index ini. Baris yang
+lebih tua dari tiap pasangan dihapus (21 → 18) atas persetujuan.
+
+**Kolom yang ternyata sudah ada.** `med_logs` sudah punya kolom `slot`
+(`int not null default 0`) beserta unique index
+`med_logs_unik_slot (medication_id, tanggal, slot)` sejak prototipe web —
+keduanya **tidak tercantum** di `teman-lupus-supabase-schema.sql`. Versi
+pertama migrasi ini menambahkan `dosis_ke` yang gunanya sama persis, sehingga
+aplikasi menulis semua dosis dengan `slot = 0` dan tanda dosis ke-2 selalu
+ditolak database, sementara dosis pertama tampak normal karena barisnya hanya
+di-update. `dosis_ke` sudah dibuang; aplikasi memakai `slot` (berbasis 0).
+Pelajarannya: **periksa tabel yang hidup, jangan percaya file skema** — file
+ini memang sudah tertinggal, seperti tercatat di awal bagian ini.
 
 Aplikasi ini menyimpan check-in dengan upsert (`onConflict: patient_id,tanggal`)
 sehingga mengisi ulang di hari yang sama **memperbarui** baris, bukan menambah
@@ -191,10 +202,16 @@ aplikasi:
 ### Obat: frekuensi dosis & riwayat berhenti
 
 Tiap obat punya **frekuensi** (1–4x sehari). Obat 3x sehari menampilkan tiga
-baris tanda pada layar Obat, dan tiap dosis dicatat sebagai baris `med_logs`
-tersendiri (`dosis_ke`) — sebelumnya satu obat hanya bisa ditandai sekali per
-hari, sehingga pasien yang minum 3x sehari tidak punya cara mencatat dosis yang
-terlewat.
+baris centang pada layar Obat, dan tiap dosis dicatat sebagai baris `med_logs`
+tersendiri (kolom `slot`, berbasis 0) — sebelumnya satu obat hanya bisa ditandai
+sekali per hari, sehingga pasien yang minum 3x sehari tidak punya cara mencatat
+dosis yang terlewat.
+
+Seluruh baris centangnya bisa diketuk (tinggi 44pt), bukan kotak kecilnya saja.
+Menandai dosis **tidak** memuat ulang layar: `muat()` menyalakan `loading` dan
+mengganti seluruh layar dengan spinner, sehingga ketukan berikutnya jatuh di
+spinner itu — pada obat 3x sehari tombolnya jadi terasa mati. Keadaan layar
+sudah benar dari pembaruan optimistis; jaringan tinggal menyusul.
 
 Menghentikan obat **tidak menghapus apa pun**: barisnya ditandai tidak aktif,
 pindah ke daftar "Obat yang pernah diminum" beserta tanggal berhentinya, dan

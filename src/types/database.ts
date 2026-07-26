@@ -47,8 +47,16 @@ export type MedLog = {
   patient_id: string;
   medication_id: string | null;
   tanggal: string;
-  /** Dosis ke berapa pada hari itu (1–6). */
-  dosis_ke: number;
+  /**
+   * Dosis ke berapa pada hari itu, dihitung dari 0 (0 = dosis pertama).
+   *
+   * Kolom ini sudah ada sejak prototipe web beserta unique index
+   * `(medication_id, tanggal, slot)`, meskipun tidak tercantum di
+   * teman-lupus-supabase-schema.sql. Basisnya 0 karena baris lama memakai
+   * nilai default 0 — mengubahnya ke basis 1 akan membuat catatan lama
+   * terbaca sebagai dosis yang berbeda.
+   */
+  slot: number;
   diminum: boolean | null;
   alasan: string | null;
   created_at: string;

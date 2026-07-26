@@ -1,10 +1,12 @@
 -- ============================================================
 -- TEMAN LUPUS — frekuensi dosis & riwayat berhenti/lanjut obat
 --
--- Tiga hal yang ditambahkan:
+-- Dua hal yang ditambahkan:
 --   1. medications.frekuensi   — berapa kali obat diminum per hari
---   2. med_logs.dosis_ke       — dosis ke berapa pada hari itu
---   3. tabel medication_events — riwayat mulai / stop / lanjut
+--   2. tabel medication_events — riwayat mulai / stop / lanjut
+--
+-- Ditambah pembersihan: kolom `med_logs.dosis_ke` yang sempat dibuat
+-- 27 Juli 2026 dibuang lagi — lihat catatan di bagian 2.
 --
 -- Sebelum ini, obat 3x sehari hanya bisa ditandai satu kali per hari, dan
 -- obat yang dihentikan hilang tanpa jejak tanggal.
@@ -23,38 +25,56 @@ alter table public.medications
 alter table public.medications
   add constraint medications_frekuensi_check check (frekuensi between 1 and 6);
 
--- ---------- 2. Dosis ke berapa dalam sehari ----------
+-- ---------- 2. Dosis ke berapa dalam sehari: pakai `slot` ----------
+
+-- ⚠️ Pelajaran mahal: `med_logs` di database SUDAH punya kolom `slot`
+-- (integer not null default 0) beserta unique index
+-- `med_logs_unik_slot (medication_id, tanggal, slot)` sejak prototipe web,
+-- meskipun keduanya TIDAK tercantum di teman-lupus-supabase-schema.sql.
+--
+-- Versi pertama file ini menambah kolom `dosis_ke` yang gunanya sama persis.
+-- Akibatnya aplikasi menulis dosis ke-2 dengan slot tetap 0, bentrok dengan
+-- baris dosis pertama, dan tanda dosis ke-2 selalu ditolak database —
+-- sementara dosis pertama tampak normal karena barisnya hanya di-update.
+--
+-- Jadi: `slot` yang dipakai, `dosis_ke` dibuang. `slot` berbasis 0
+-- (0 = dosis pertama), mengikuti baris lama yang memakai nilai default 0.
+
+-- Untuk project baru yang skemanya belum punya `slot`:
+alter table public.med_logs
+  add column if not exists slot int not null default 0;
 
 alter table public.med_logs
-  add column if not exists dosis_ke int not null default 1;
+  drop constraint if exists med_logs_slot_check;
 
 alter table public.med_logs
-  drop constraint if exists med_logs_dosis_ke_check;
+  add constraint med_logs_slot_check check (slot between 0 and 5);
 
-alter table public.med_logs
-  add constraint med_logs_dosis_ke_check check (dosis_ke between 1 and 6);
-
--- Satu baris per dosis per hari. Aplikasi memakai upsert dengan onConflict
--- ini; tanpa unique index, menandai dosis yang sama dua kali akan menambah
--- baris baru dan hitungan kepatuhan jadi salah.
+-- Aplikasi memakai upsert dengan onConflict ini; tanpa unique index,
+-- menandai dosis yang sama dua kali akan menambah baris baru dan hitungan
+-- kepatuhan jadi salah.
 --
 -- Periksa dulu apakah sudah ada duplikat:
 --
---   select patient_id, medication_id, tanggal, dosis_ke, count(*)
+--   select medication_id, tanggal, slot, count(*)
 --   from public.med_logs
---   group by 1,2,3,4 having count(*) > 1;
+--   group by 1,2,3 having count(*) > 1;
 --
 -- Bila ada, sisakan baris terbaru:
 --
 --   delete from public.med_logs d using public.med_logs lain
---   where d.patient_id    = lain.patient_id
---     and d.medication_id = lain.medication_id
+--   where d.medication_id = lain.medication_id
 --     and d.tanggal       = lain.tanggal
---     and d.dosis_ke      = lain.dosis_ke
+--     and d.slot          = lain.slot
 --     and d.created_at    < lain.created_at;
 
-create unique index if not exists med_logs_dosis_unik
-  on public.med_logs (patient_id, medication_id, tanggal, dosis_ke);
+create unique index if not exists med_logs_unik_slot
+  on public.med_logs (medication_id, tanggal, slot);
+
+-- Buang kolom & index bikinan versi pertama. Isinya seragam (semua bernilai
+-- default 1), jadi tidak ada informasi yang hilang.
+drop index if exists public.med_logs_dosis_unik;
+alter table public.med_logs drop column if exists dosis_ke;
 
 -- ---------- 3. Riwayat mulai / stop / lanjut ----------
 
