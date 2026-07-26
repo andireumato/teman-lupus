@@ -1,56 +1,163 @@
-# Welcome to your Expo app 👋
+# Teman Lupus
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Aplikasi pendamping pasien Lupus Eritematosus Sistemik (SLE) — check-in harian,
+triase tanda bahaya, kepatuhan obat, hasil lab, dan tren.
 
-## Get started
+Expo SDK 57 · React Native 0.86 · TypeScript · Supabase.
 
-1. Install dependencies
+> **Bukan alat diagnosis.** Aplikasi ini mencatat dan menyaring (triage), bukan
+> mengambil keputusan klinis. Untuk keadaan darurat → IGD.
 
-   ```bash
-   npm install
-   ```
+---
 
-2. Start the app
+## ⚠️ Backend perlu disiapkan lebih dulu
 
-   ```bash
-   npx expo start
-   ```
+`.env` saat ini menunjuk ke `zuaskccuznkljafznofq.supabase.co` — project yang
+dipakai prototipe web. **Host itu sudah tidak ada lagi** (DNS NXDOMAIN), jadi
+login akan gagal dengan _"fetch failed: A server with the specified hostname
+could not be found."_
 
-In the output, you'll find options to open the app in a
+Untuk menjalankannya:
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+1. Buat project Supabase baru.
+2. SQL Editor → jalankan berurutan:
+   - `teman-lupus-supabase-schema.sql` (skema utama, 10 tabel + RLS)
+   - `supabase/lab_results.sql`
+   - `supabase/consent_columns.sql`
+   - `supabase/unique_checkin_per_hari.sql`
+3. Salin Project URL & anon key ke `.env`.
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+---
 
-## Get a fresh project
-
-When you're ready, run:
+## Menjalankan
 
 ```bash
-npm run reset-project
+npm install
+cp .env.example .env      # isi URL & anon key Supabase
+npm start                 # lalu tekan i (iOS) / a (Android), atau pindai QR dengan Expo Go
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+| Perintah            | Fungsi                                         |
+| ------------------- | ---------------------------------------------- |
+| `npm test`          | Unit test (red-flag, MARS-5, tanggal) — 45 test |
+| `npm run typecheck` | Cek tipe TypeScript                            |
+| `npm run lint`      | ESLint + Prettier                              |
+| `npm run format`    | Rapikan format kode                            |
+| `npm run doctor`    | Cek kesehatan dependensi Expo                  |
 
-### Other setup steps
+Anon key memang dirancang untuk disertakan di aplikasi klien — yang melindungi
+data adalah Row Level Security di Supabase, bukan kerahasiaan key ini. **Jangan
+pernah** menaruh `service_role` key di `.env`.
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+---
 
-## Learn more
+## Struktur
 
-To learn more about developing your project with Expo, look at the following resources:
+```
+src/
+  app/                    rute (expo-router, file-based)
+    _layout.tsx           penjaga rute: login → consent → tabs
+    login.tsx             masuk / daftar (pasien atau dokter)
+    consent.tsx           informed consent, wajib sebelum masuk
+    mars.tsx              kuesioner MARS-5
+    (tabs)/
+      index.tsx           Check-in harian
+      flare.tsx           Cek Flare (triase tanda bahaya)
+      obat.tsx            Obat & kepatuhan
+      lab.tsx             Hasil laboratorium
+      tren.tsx            Grafik, riwayat, akun
+  lib/
+    redflag.ts            red-flag engine [DETERMINISTIK]
+    mars.ts               skoring MARS-5
+    dates.ts              tanggal lokal & streak
+    session.tsx           auth + profil + consent
+    supabase.ts           klien Supabase
+  constants/
+    lupus.ts              gejala per sistem organ, panel lab & nilai rujukan
+    consent.ts            naskah informed consent + versinya
+    brand.ts              palet warna
+  types/database.ts       bentuk tabel Supabase
+supabase/                 SQL pelengkap yang belum ada di skema awal
+```
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+---
 
-## Join the community
+## Red-flag engine — bagian paling penting
 
-Join our community of developers creating universal apps.
+`src/lib/redflag.ts` mengimplementasikan Bagian 6 spesifikasi MVP. Keputusan
+eskalasi ditentukan **hanya oleh aturan eksplisit** — tidak ada model bahasa,
+tidak ada skor probabilistik, tidak ada heuristik.
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+| Tingkat      | `flare_checks.hasil` | Tindakan                           |
+| ------------ | -------------------- | ---------------------------------- |
+| **darurat**  | `red`                | Segera ke IGD                      |
+| **mendesak** | `yellow`             | Hubungi tim dokter ≤ 24 jam        |
+| **aman**     | `green`              | Dicatat untuk dibahas saat kontrol |
+
+Sifat yang sengaja dipertahankan:
+
+- **Fail-safe.** Bila darurat dan mendesak terpicu bersamaan → darurat. Demam
+  tinggi tanpa konteks imunosupresan turun ke _mendesak_, bukan _aman_.
+- **Murni.** `evaluateRedFlags()` tidak melakukan I/O, jadi bisa diaudit dan
+  diuji baris per baris. 24 test menutupi setiap aturan.
+- **Tidak menunggu jaringan.** Hasil dihitung di perangkat lalu baru disimpan,
+  supaya pesan darurat tidak pernah tertunda oleh koneksi lambat.
+- **Konteks diturunkan dari data, bukan ingatan pasien.** "Memburuk beruntun"
+  dihitung dari 3 check-in terakhir; "sedang memakai imunosupresan" dibaca dari
+  daftar obat aktif.
+
+### Wajib direview reumatolog sebelum dipakai ke pasien nyata
+
+1. **Ambang & definisi aturan** (`src/lib/redflag.ts`) — "demam tinggi" belum
+   punya angka; "dosis steroid signifikan" belum dibedakan (saat ini semua
+   steroid dianggap signifikan, fail-safe).
+2. **Daftar kata kunci imunosupresan** (`src/app/(tabs)/flare.tsx`,
+   konstanta `IMUNOSUPRESAN`) — menentukan apakah demam dieskalasi ke darurat.
+3. **Definisi "memburuk beruntun"** (`flare.tsx`, `memburukBeruntun`) — saat
+   ini: skor `lelah + nyeri_sendi` naik 3 hari berturut-turut.
+4. **Nilai rujukan lab** (`src/constants/lupus.ts`) — indikatif, berbeda antar
+   laboratorium.
+5. **Ambang kategori MARS-5** (`src/lib/mars.ts`: Tinggi ≥ 23, Sedang ≥ 18) —
+   cocokkan dengan rujukan yang dipakai di protokol penelitian.
+
+---
+
+## Database
+
+Skema utama: `teman-lupus-supabase-schema.sql` (10 tabel + RLS).
+Folder `supabase/` berisi SQL yang **belum ada** di skema itu tetapi dibutuhkan
+aplikasi ini:
+
+| File                          | Kegunaan                                                        |
+| ----------------------------- | --------------------------------------------------------------- |
+| `lab_results.sql`             | Tabel hasil lab + RLS (dipakai prototipe, tak ada di skema)      |
+| `consent_columns.sql`         | `profiles.consent_at` & `profiles.consent_version`               |
+| `unique_checkin_per_hari.sql` | Unique `(patient_id, tanggal)` agar upsert check-in bekerja      |
+
+Semuanya aman dijalankan ulang. `unique_checkin_per_hari.sql` berisi query untuk
+memeriksa duplikat lebih dulu — baca komentarnya sebelum menjalankan.
+
+`patients` tidak dibuat oleh trigger auth (trigger hanya membuat `profiles`),
+jadi `session.tsx` membuatnya saat pertama kali dibutuhkan.
+
+---
+
+## Consent
+
+Naskah ada di `src/constants/consent.ts`. Setiap kali naskah berubah,
+**naikkan `CONSENT_VERSION`** — pasien yang menyetujui versi lama akan diminta
+menyetujui ulang. Ini syarat audit etik.
+
+---
+
+## Yang belum ada
+
+- **Sisi dokter**: daftar pasien, input SLEDAI, alerts, ringkasan pra-kunjungan.
+  Tabel `sledai_assessments`, `visits`, dan `alerts` sudah ada di skema tetapi
+  belum dipakai. Pengguna dengan peran `doctor` saat ini masuk ke tampilan yang
+  sama dengan pasien.
+- **Ringkasan pra-kunjungan** (Bagian 8 spesifikasi MVP).
+- **Pengingat obat** & notifikasi.
+- **Ekspor CSV** untuk penelitian.
+- **PRO tervalidasi Bahasa Indonesia** (mis. Lupus Impact Tracker) — lihat
+  catatan validasi di Bagian 7 spesifikasi MVP.

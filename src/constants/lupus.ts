@@ -1,0 +1,144 @@
+/**
+ * Konstanta klinis Teman Lupus.
+ *
+ * Nilai rujukan lab di bawah disalin dari prototipe web dan bersifat
+ * INDIKATIF untuk menandai "di luar rentang" pada tampilan pasien.
+ * Rentang rujukan sebenarnya berbeda antar laboratorium — angka ini
+ * wajib direview reumatolog sebelum dipakai ke pasien nyata.
+ */
+
+export interface LabRef {
+  /** Nama pemeriksaan, dipakai sebagai kolom `jenis` di lab_results. */
+  k: string;
+  /** Satuan default. */
+  u: string;
+  /** Batas bawah rujukan. */
+  lo?: number;
+  /** Batas atas rujukan. */
+  hi?: number;
+}
+
+export const LABS: LabRef[] = [
+  { k: 'Anti-dsDNA', u: 'IU/mL', hi: 30 },
+  { k: 'Komplemen C3', u: 'mg/dL', lo: 90, hi: 180 },
+  { k: 'Komplemen C4', u: 'mg/dL', lo: 10, hi: 40 },
+  { k: 'CRP', u: 'mg/L', hi: 5 },
+  { k: 'LED/ESR', u: 'mm/jam', hi: 20 },
+  { k: 'Hemoglobin', u: 'g/dL', lo: 12, hi: 16 },
+  { k: 'Leukosit', u: '/µL', lo: 4000, hi: 11000 },
+  { k: 'Trombosit', u: '/µL', lo: 150000, hi: 400000 },
+  { k: 'Kreatinin', u: 'mg/dL', lo: 0.6, hi: 1.2 },
+  { k: 'Proteinuria 24 jam', u: 'mg/24jam', hi: 150 },
+  { k: 'Rasio Protein/Kreatinin urin', u: 'mg/g', hi: 150 },
+  { k: 'Vitamin D 25-OH', u: 'ng/mL', lo: 30, hi: 100 },
+];
+
+export const ANA_ANTIBODIES = [
+  'dsDNA',
+  'Sm',
+  'U1-RNP',
+  'SS-A (Ro)',
+  'SS-B (La)',
+  'Scl-70',
+  'Jo-1',
+  'Sentromer',
+  'Nukleosom',
+  'Histon',
+  'Ribosomal-P',
+  'PM-Scl',
+  'AMA-M2',
+  'PCNA',
+] as const;
+
+export const ANA_PROFILE = 'ANA Profile';
+
+export function labRef(jenis: string): LabRef | undefined {
+  return LABS.find((l) => l.k === jenis);
+}
+
+/** True bila nilai berada di luar rentang rujukan indikatif. */
+export function labAbnormal(jenis: string, nilai: number | null): boolean {
+  const r = labRef(jenis);
+  if (!r || nilai == null) return false;
+  return (r.lo != null && nilai < r.lo) || (r.hi != null && nilai > r.hi);
+}
+
+/**
+ * Skrining gejala per sistem organ (Bagian 5 spesifikasi MVP).
+ * Bahasa awam, bukan istilah medis.
+ */
+export const SISTEM_GEJALA: { system: string; label: string; items: string[] }[] = [
+  {
+    system: 'konstitusional',
+    label: 'Umum',
+    items: ['Kelelahan luar biasa', 'Demam', 'Berat badan turun'],
+  },
+  {
+    system: 'kulit',
+    label: 'Kulit & mulut',
+    items: [
+      'Ruam di wajah/pipi',
+      'Ruam muncul setelah kena matahari',
+      'Sariawan',
+      'Rambut rontok',
+      'Jari memutih/membiru saat dingin',
+    ],
+  },
+  {
+    system: 'sendi',
+    label: 'Sendi & otot',
+    items: ['Nyeri sendi', 'Bengkak sendi', 'Kaku saat bangun pagi', 'Nyeri otot'],
+  },
+  {
+    system: 'ginjal',
+    label: 'Ginjal',
+    items: ['Bengkak di kaki/kelopak mata', 'Urin berbusa', 'Jumlah buang air kecil berubah'],
+  },
+  {
+    system: 'kardiopulmoner',
+    label: 'Jantung & paru',
+    items: ['Nyeri dada', 'Sesak napas'],
+  },
+  {
+    system: 'saraf',
+    label: 'Saraf',
+    items: [
+      'Sakit kepala hebat',
+      'Kejang',
+      'Bingung / sulit fokus',
+      'Gangguan penglihatan',
+      'Kebas atau lemah satu sisi',
+    ],
+  },
+  {
+    system: 'darah',
+    label: 'Darah',
+    items: ['Mudah memar', 'Perdarahan tidak biasa', 'Tampak pucat/lemas'],
+  },
+];
+
+export const PERUBAHAN_GEJALA = ['baru', 'membaik', 'sama', 'memburuk'] as const;
+
+/** Skala check-in harian, mengikuti constraint kolom di Supabase. */
+export const SKALA_MOOD = [
+  { v: 1, label: 'Sangat buruk' },
+  { v: 2, label: 'Buruk' },
+  { v: 3, label: 'Biasa' },
+  { v: 4, label: 'Baik' },
+  { v: 5, label: 'Sangat baik' },
+];
+
+export const SKALA_LELAH = [
+  { v: 0, label: 'Tidak ada' },
+  { v: 1, label: 'Ringan' },
+  { v: 2, label: 'Sedang' },
+  { v: 3, label: 'Berat' },
+  { v: 4, label: 'Sangat berat' },
+];
+
+export const SKALA_NYERI_SENDI = [
+  { v: 0, label: 'Tidak ada' },
+  { v: 1, label: 'Ringan' },
+  { v: 2, label: 'Sedang' },
+  { v: 3, label: 'Berat' },
+];
