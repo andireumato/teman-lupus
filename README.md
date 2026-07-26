@@ -66,7 +66,7 @@ npm start                 # lalu tekan i (iOS) / a (Android), atau pindai QR den
 
 | Perintah            | Fungsi                                         |
 | ------------------- | ---------------------------------------------- |
-| `npm test`          | Unit test (red-flag, ringkasan, MARS-5, UV, beranda, tanggal) — 140 test |
+| `npm test`          | Unit test (red-flag, ringkasan, MARS-5, UV, beranda, tanggal) — 142 test |
 | `npm run typecheck` | Cek tipe TypeScript                            |
 | `npm run lint`      | ESLint + Prettier                              |
 | `npm run format`    | Rapikan format kode                            |
@@ -173,7 +173,7 @@ hari terakhir**. Tombol di bawah layar membagikan versi teks satu halaman
 
 Isi layar dan isi teks dirakit dari objek yang sama (`buatRingkasan()` →
 `ringkasanTeks()`), jadi keduanya tidak bisa berbeda. Perakitnya murni tanpa
-I/O — 42 test menutupi setiap aturan pengelompokan.
+I/O — 44 test menutupi setiap aturan pengelompokan.
 
 **Yang dijaga:** ringkasan hanya merangkum apa yang pasien catat. Ia tidak
 menilai aktivitas penyakit, tidak menyebut flare sebagai kesimpulan, dan tidak
@@ -223,6 +223,11 @@ memicu tindakan apa pun):
 - Ambang "menonjol" di bagian 3: nyeri sendi ≥ 2 (sedang–berat), kelelahan ≥ 3
   (berat), mood ≤ 2 (buruk). Jendela pembandingnya 14 hari terakhir vs 14 hari
   sebelumnya — dipotong setengah periode bila periodenya lebih pendek.
+- Penyebut hitungan itu **hari yang tercatat**, bukan hari kalender, dan
+  panjang jendelanya tetap disebut ("6 dari 7 hari yang tercatat (dalam 14 hari
+  terakhir)"). Alasannya: pasien yang jarang mengisi biasanya justru sedang
+  tidak enak badan, dan penyebut kalender akan meremehkan angkanya — 6 dari 7
+  hari terisi terbaca "6 dari 14".
 - "Mulai memberat" butuh ≥ 3 hari kalender berturut-turut dengan nyeri ≥ 2;
   yang dilaporkan adalah rentetan terakhir.
 - "Muncul bersamaan" butuh ≥ 2 gejala dari ≥ 2 sistem organ yang pertama

@@ -12,8 +12,9 @@
  * - Ringkasan ini MERANGKUM apa yang pasien catat. Ia tidak menilai aktivitas
  *   penyakit, tidak menyebut flare sebagai kesimpulan, dan tidak pernah
  *   menyarankan perubahan terapi.
- * - Satu-satunya jalur eskalasi tetap `redflag.ts`. Bagian "indikator" di sini
- *   adalah PENGAMATAN berangka atas data, bukan pemicu tindakan.
+ * - Satu-satunya jalur eskalasi tetap `redflag.ts`. Bagian "Perubahan &
+ *   waktunya" di sini deskriptif — hitungan hari atas data, bukan pemicu
+ *   tindakan.
  */
 
 import { SISTEM_GEJALA } from '@/constants/lupus';
@@ -479,13 +480,28 @@ function perubahanTerkini(rows: DailyCheckin[], dari: string, sampai: string): s
   const hitung = (awal: string, akhir: string, test: Metrik['test']) =>
     rows.filter((r) => dalam(r.tanggal, awal, akhir) && test(r)).length;
 
+  // Penyebutnya HARI YANG TERCATAT, bukan hari kalender: pasien yang jarang
+  // mengisi biasanya justru sedang tidak enak badan, dan penyebut kalender
+  // akan meremehkan angkanya (6 dari 7 hari terisi terbaca "6 dari 14").
+  // Panjang jendelanya tetap disebut supaya bolongnya data tidak hilang.
+  const tercatatBaru = rows.filter((r) => dalam(r.tanggal, awalBaru, sampai)).length;
+  const tercatatLama = rows.filter((r) => dalam(r.tanggal, awalLama, akhirLama)).length;
+
   for (const m of METRIK) {
     const baru = hitung(awalBaru, sampai, m.test);
     const lama = hitung(awalLama, akhirLama, m.test);
     if (baru === 0 && lama === 0) continue;
-    out.push(
-      `${m.label}: ${baru} dari ${jendela} hari terakhir, sebelumnya ${lama} dari ${jendela} hari.`
-    );
+
+    const sisiBaru =
+      tercatatBaru === 0
+        ? `tidak ada catatan dalam ${jendela} hari terakhir`
+        : `${baru} dari ${tercatatBaru} hari yang tercatat (dalam ${jendela} hari terakhir)`;
+    const sisiLama =
+      tercatatLama === 0
+        ? 'sebelumnya tidak ada catatan'
+        : `sebelumnya ${lama} dari ${tercatatLama}`;
+
+    out.push(`${m.label}: ${sisiBaru}, ${sisiLama}.`);
   }
 
   const rentetan = rentetanNyeri(rows);
@@ -501,8 +517,7 @@ function perubahanTerkini(rows: DailyCheckin[], dari: string, sampai: string): s
     out.push(`Muncul bersamaan sejak ${tanggalPendek(bersamaan.tanggal)}: ${daftar}.`);
   }
 
-  const tercatat = rows.filter((r) => dalam(r.tanggal, awalBaru, sampai)).length;
-  const kosong = jendela - tercatat;
+  const kosong = jendela - tercatatBaru;
   if (kosong > 0) {
     out.push(
       `${kosong} dari ${jendela} hari terakhir tanpa check-in — hari itu tidak terpantau, bukan berarti tanpa gejala.`

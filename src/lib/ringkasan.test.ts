@@ -325,11 +325,36 @@ describe('perubahan & waktunya', () => {
         ],
       })
     );
+    // Penyebutnya hari yang tercatat, bukan hari kalender — pasien yang jarang
+    // mengisi tidak boleh terbaca lebih ringan daripada keadaannya.
     expect(cari(r, 'Nyeri sendi sedang–berat')).toBe(
-      'Nyeri sendi sedang–berat (≥2): 3 dari 14 hari terakhir, sebelumnya 1 dari 14 hari.'
+      'Nyeri sendi sedang–berat (≥2): 3 dari 3 hari yang tercatat (dalam 14 hari terakhir), sebelumnya 1 dari 1.'
     );
     // Skala kelelahan & nyeri tidak boleh dijumlahkan jadi angka karangan.
     expect(r.perubahan.some((p) => /beban/i.test(p))).toBe(false);
+  });
+
+  it('jendela pembanding tanpa satu pun check-in dikatakan apa adanya', () => {
+    const r = buatRingkasan(
+      input({
+        checkins: [
+          checkin({ tanggal: '2026-07-20', nyeri_sendi: 3 }),
+          checkin({ tanggal: '2026-07-21', nyeri_sendi: 2 }),
+        ],
+      })
+    );
+    expect(cari(r, 'Nyeri sendi sedang–berat')).toBe(
+      'Nyeri sendi sedang–berat (≥2): 2 dari 2 hari yang tercatat (dalam 14 hari terakhir), sebelumnya tidak ada catatan.'
+    );
+  });
+
+  it('jendela terkini tanpa check-in tidak dilaporkan sebagai nol', () => {
+    const r = buatRingkasan(
+      input({ checkins: [checkin({ tanggal: '2026-07-05', nyeri_sendi: 3 })] })
+    );
+    expect(cari(r, 'Nyeri sendi sedang–berat')).toBe(
+      'Nyeri sendi sedang–berat (≥2): tidak ada catatan dalam 14 hari terakhir, sebelumnya 1 dari 1.'
+    );
   });
 
   it('metrik yang nol di kedua jendela tidak ditampilkan', () => {
