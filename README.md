@@ -31,6 +31,11 @@ alter table public.daily_checkins
   add constraint daily_checkins_patient_tanggal_key unique (patient_id, tanggal);
 ```
 
+Tabel `visit_questions` **belum ada** di project ini (dicek 26 Juli 2026,
+REST menjawab `PGRST205`). Jalankan `supabase/visit_questions.sql` di Dashboard
+→ SQL Editor. Sebelum itu, bagian "Pertanyaan untuk dokter" di layar ringkasan
+akan menampilkan pesan bahwa tabelnya belum dibuat.
+
 Aplikasi ini menyimpan check-in dengan upsert (`onConflict: patient_id,tanggal`)
 sehingga mengisi ulang di hari yang sama **memperbarui** baris, bukan menambah
 baris baru. Kalau suatu saat constraint ini hilang, penyimpanan check-in akan
@@ -44,6 +49,7 @@ Bila suatu saat perlu menyiapkan project Supabase dari nol:
    - `supabase/lab_results.sql`
    - `supabase/consent_columns.sql`
    - `supabase/unique_checkin_per_hari.sql`
+   - `supabase/visit_questions.sql`
 3. Salin Project URL & anon key ke `.env`.
 
 ---
@@ -197,10 +203,19 @@ memicu tindakan apa pun):
 
 **Privasi.** Teks memakai inisial + 8 karakter pertama ID pasien, bukan nama
 lengkap. Membagikan tetap berarti mengeluarkan data medis dari aplikasi, jadi
-ada peringatan tepat di atas tombolnya. Pertanyaan yang ditulis pasien untuk
-kunjungan disimpan **di perangkat saja** (AsyncStorage) — belum ada tabelnya di
-Supabase, jadi hilang bila aplikasi dihapus dan tidak ikut pindah antar
-perangkat.
+ada peringatan tepat di atas tombolnya.
+
+**Pertanyaan untuk kunjungan** disimpan di tabel `visit_questions`
+(`supabase/visit_questions.sql`), jadi tidak hilang bila aplikasi dihapus dan
+ikut pindah antar perangkat. Dokter penanggung jawab sudah boleh membacanya
+lewat RLS, tinggal menunggu layar sisi dokter dibuat.
+
+Versi pertama menyimpannya di perangkat (AsyncStorage). Layar `/ringkasan`
+memindahkan sisa data lokal itu ke Supabase sekali saat dibuka, lalu membuang
+kuncinya — dan hanya membuang kunci **setelah** pemindahan berhasil, supaya
+tidak ada pertanyaan yang hilang bila jaringan gagal. Bila tabelnya belum
+dibuat, layar menampilkan pesan yang menyebut file SQL-nya dan enam bagian
+ringkasan lain tetap jalan.
 
 ---
 
@@ -257,6 +272,7 @@ aplikasi ini:
 | `lab_results.sql`             | Tabel hasil lab + RLS (dipakai prototipe, tak ada di skema)      |
 | `consent_columns.sql`         | `profiles.consent_at` & `profiles.consent_version`               |
 | `unique_checkin_per_hari.sql` | Unique `(patient_id, tanggal)` agar upsert check-in bekerja      |
+| `visit_questions.sql`         | Pertanyaan pasien untuk kunjungan (bagian 6 ringkasan)          |
 
 Semuanya aman dijalankan ulang. `unique_checkin_per_hari.sql` berisi query untuk
 memeriksa duplikat lebih dulu — baca komentarnya sebelum menjalankan.
@@ -285,7 +301,6 @@ menyetujui ulang. Ini syarat audit etik.
 - **Tindak lanjut sesudah peringatan red-flag** — tidak ada layar yang bertanya
   "apa yang kamu lakukan setelah itu?", jadi bagian 5 ringkasan selalu berkata
   belum tercatat.
-- **Sinkronisasi pertanyaan kunjungan** — kini hanya di perangkat pasien.
 - **Pengingat obat** & notifikasi.
 - **Ekspor CSV** untuk penelitian.
 - **PRO tervalidasi Bahasa Indonesia** (mis. Lupus Impact Tracker) — lihat

@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Platform, Pressable, Share, StyleSheet, Text, View } from 'react-native';
 
 import {
@@ -37,6 +37,7 @@ import type {
   MarsAssessment,
   MedLog,
   Medication,
+  VisitQuestion,
 } from '@/types/database';
 
 const PERIODE = [
@@ -44,8 +45,15 @@ const PERIODE = [
   { v: 90, label: '90 hari' },
 ];
 
-/** Pertanyaan pasien disimpan di perangkat saja — belum ada tabelnya di Supabase. */
+/** Kunci penyimpanan lama di perangkat; hanya dibaca untuk dipindahkan ke Supabase. */
 const kunciPertanyaan = (patientId: string) => `pertanyaan-kunjungan:${patientId}`;
+
+/** Tabel visit_questions belum tentu ada di project Supabase lama. */
+function pesanTabelPertanyaan(pesan: string): string {
+  return pesan.includes('visit_questions')
+    ? 'Tabel pertanyaan kunjungan belum ada di Supabase. Jalankan supabase/visit_questions.sql di SQL Editor. Bagian ringkasan yang lain tetap bisa dipakai.'
+    : pesan;
+}
 
 const ARAH_LABEL = { naik: 'naik', turun: 'turun', stabil: 'stabil' } as const;
 
@@ -88,26 +96,52 @@ export default function RingkasanScreen() {
   const [hari, setHari] = useState(30);
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<DataMentah | null>(null);
-  const [pertanyaan, setPertanyaan] = useState<string[]>([]);
+  const [pertanyaan, setPertanyaan] = useState<VisitQuestion[]>([]);
+  const [tanyaErr, setTanyaErr] = useState<string | null>(null);
   const [draf, setDraf] = useState('');
+  const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
 
-  // Pertanyaan dimuat sekali, lalu ikut masuk setiap kali ringkasan dirakit.
-  useEffect(() => {
-    if (!patientId) return;
-    let hidup = true;
-    AsyncStorage.getItem(kunciPertanyaan(patientId))
-      .then((raw) => {
-        if (!hidup || !raw) return;
+  /**
+   * Pertanyaan kunjungan disimpan di Supabase agar tidak hilang bila aplikasi
+   * dihapus. Versi sebelumnya menyimpannya di perangkat, jadi isi AsyncStorage
+   * yang tersisa dipindahkan sekali lalu kuncinya dibuang.
+   */
+  const muatPertanyaan = useCallback(async (pid: string) => {
+    try {
+      const raw = await AsyncStorage.getItem(kunciPertanyaan(pid));
+      if (raw) {
         const parsed: unknown = JSON.parse(raw);
-        if (Array.isArray(parsed)) setPertanyaan(parsed.filter((p) => typeof p === 'string'));
-      })
-      .catch(() => {});
-    return () => {
-      hidup = false;
-    };
-  }, [patientId]);
+        const lama = (Array.isArray(parsed) ? parsed : [])
+          .filter((p): p is string => typeof p === 'string' && p.trim().length > 0)
+          .map((p) => ({ patient_id: pid, teks: p.trim() }));
+
+        if (lama.length > 0) {
+          const { error } = await supabase.from('visit_questions').insert(lama);
+          if (error) throw error;
+        }
+        // Baru dibuang setelah pemindahan berhasil — bila gagal, dicoba lagi
+        // pada pembukaan berikutnya dan tidak ada pertanyaan yang hilang.
+        await AsyncStorage.removeItem(kunciPertanyaan(pid));
+      }
+    } catch {
+      // Diamkan: kegagalan pemindahan tidak boleh menghalangi pemuatan.
+    }
+
+    const { data: rows, error } = await supabase
+      .from('visit_questions')
+      .select('*')
+      .eq('patient_id', pid)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      setTanyaErr(pesanTabelPertanyaan(error.message));
+      return;
+    }
+    setTanyaErr(null);
+    setPertanyaan((rows ?? []) as VisitQuestion[]);
+  }, []);
 
   const muat = useCallback(async () => {
     if (!patientId) {
@@ -160,8 +194,9 @@ export default function RingkasanScreen() {
       flares: (f.data ?? []) as FlareCheck[],
       labs: (lab.data ?? []) as LabResult[],
     });
+    await muatPertanyaan(patientId);
     setLoading(false);
-  }, [patientId, hari]);
+  }, [patientId, hari, muatPertanyaan]);
 
   useFocusEffect(
     useCallback(() => {
@@ -174,25 +209,36 @@ export default function RingkasanScreen() {
     return buatRingkasan({
       ...data,
       pasien: { inisial: inisialNama(profile?.nama), id: idPendek(patientId) },
-      pertanyaan,
+      pertanyaan: pertanyaan.map((p) => p.teks),
     });
   }, [data, profile?.nama, patientId, pertanyaan]);
 
-  async function simpanPertanyaan(next: string[]) {
-    setPertanyaan(next);
-    if (!patientId) return;
-    try {
-      await AsyncStorage.setItem(kunciPertanyaan(patientId), JSON.stringify(next));
-    } catch {
-      setErr('Pertanyaan gagal disimpan di perangkat, tetapi tetap masuk ke ringkasan ini.');
+  async function tambahPertanyaan() {
+    const teks = draf.trim();
+    if (!teks || !patientId) return;
+
+    setBusy(true);
+    const { error } = await supabase
+      .from('visit_questions')
+      .insert({ patient_id: patientId, teks });
+    setBusy(false);
+
+    if (error) {
+      setTanyaErr(pesanTabelPertanyaan(error.message));
+      return;
     }
+    setDraf('');
+    await muatPertanyaan(patientId);
   }
 
-  function tambahPertanyaan() {
-    const t = draf.trim();
-    if (!t) return;
-    setDraf('');
-    void simpanPertanyaan([...pertanyaan, t]);
+  async function hapusPertanyaan(q: VisitQuestion) {
+    if (!patientId) return;
+    const { error } = await supabase.from('visit_questions').delete().eq('id', q.id);
+    if (error) {
+      setTanyaErr(`Gagal menghapus pertanyaan: ${error.message}`);
+      return;
+    }
+    await muatPertanyaan(patientId);
   }
 
   async function bagikan() {
@@ -353,16 +399,18 @@ export default function RingkasanScreen() {
       <Card>
         <SectionLabel>6. Pertanyaan untuk dokter</SectionLabel>
         <Text style={styles.catatanKecil}>
-          Tersimpan di perangkatmu saja, dan ikut tercetak di ringkasan.
+          Tersimpan di akunmu, jadi tetap ada meski aplikasi dipasang ulang. Ikut tercetak di
+          ringkasan.
         </Text>
-        {pertanyaan.map((p, i) => (
-          <View key={`${i}|${p}`} style={styles.tanya}>
-            <Text style={styles.tanyaTeks}>• {p}</Text>
+        {tanyaErr && <Msg tone="err">{tanyaErr}</Msg>}
+        {pertanyaan.map((p) => (
+          <View key={p.id} style={styles.tanya}>
+            <Text style={styles.tanyaTeks}>• {p.teks}</Text>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={`Hapus pertanyaan: ${p}`}
+              accessibilityLabel={`Hapus pertanyaan: ${p.teks}`}
               hitSlop={8}
-              onPress={() => void simpanPertanyaan(pertanyaan.filter((_, j) => j !== i))}
+              onPress={() => void hapusPertanyaan(p)}
             >
               <Text style={styles.hapus}>Hapus</Text>
             </Pressable>
@@ -373,10 +421,14 @@ export default function RingkasanScreen() {
           value={draf}
           onChangeText={setDraf}
           placeholder="mis. Apakah boleh berjemur pagi?"
-          onSubmitEditing={tambahPertanyaan}
+          onSubmitEditing={() => void tambahPertanyaan()}
           returnKeyType="done"
         />
-        <GhostButton label="＋ Tambahkan" onPress={tambahPertanyaan} />
+        <GhostButton
+          label="＋ Tambahkan"
+          onPress={() => void tambahPertanyaan()}
+          disabled={busy || draf.trim().length === 0}
+        />
 
         {r.pertanyaan.catatan.length > 0 && (
           <View style={styles.grup}>

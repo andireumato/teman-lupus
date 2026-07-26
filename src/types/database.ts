@@ -132,6 +132,18 @@ export type LabResult = {
   created_at: string;
 };
 
+/**
+ * Pertanyaan yang pasien siapkan untuk kunjungan berikutnya (bagian 6
+ * ringkasan pra-kunjungan). BELUM ada di teman-lupus-supabase-schema.sql —
+ * lihat supabase/visit_questions.sql.
+ */
+export type VisitQuestion = {
+  id: string;
+  patient_id: string;
+  teks: string;
+  created_at: string;
+};
+
 export type Alert = {
   id: string;
   patient_id: string;
@@ -162,6 +174,7 @@ export type Database = {
       visits: Row<Visit>;
       alerts: Row<Alert>;
       lab_results: Row<LabResult>;
+      visit_questions: Row<VisitQuestion>;
     };
     Views: { [_ in never]: never };
     Functions: { [_ in never]: never };
