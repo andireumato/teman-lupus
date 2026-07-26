@@ -350,50 +350,37 @@ export default function RingkasanScreen() {
       </Card>
 
       <Card>
-        <SectionLabel>4. Kepatuhan & efek samping obat</SectionLabel>
+        <SectionLabel>4. Obat</SectionLabel>
+        <Text style={styles.catatanKecil}>Efek samping belum dicatat terstruktur.</Text>
         {r.obat.daftar.length === 0 ? (
           <Text style={styles.kosong}>Belum ada obat terdaftar.</Text>
         ) : (
           <>
             {r.obat.daftar.map((o) => (
               <Text key={o.id} style={styles.item}>
-                • {o.nama}{' '}
-                <Text style={styles.lembut}>
-                  ({o.frekuensi}x sehari{o.aktif ? '' : ', sudah dihentikan'})
-                </Text>
-                : <Text style={styles.tebal}>{o.terlewat}</Text> dosis belum diminum, {o.diminum}{' '}
-                dosis sudah
+                • {o.nama} <Text style={styles.lembut}>({o.frekuensi}x/hari)</Text>:{' '}
+                <Text style={styles.tebal}>{o.diminum}</Text> diminum · {o.terlewat} terlewat
+                {o.perubahan ? ` · ${o.perubahan}` : ''}
               </Text>
             ))}
-            <Text style={styles.lembut}>
-              Hari tanpa catatan minum obat: {r.obat.hariTanpaCatatan}
-            </Text>
+            {r.obat.hariTanpaCatatan > 0 && (
+              <Text style={styles.lembut}>
+                {r.obat.hariTanpaCatatan} dari {r.kepala.jumlahHari} hari tanpa catatan minum obat
+              </Text>
+            )}
           </>
         )}
         <Text style={styles.item}>
           • MARS-5:{' '}
           {r.obat.mars
-            ? `${r.obat.mars.total}/25 · ${r.obat.mars.kategori} (${tanggalPendek(r.obat.mars.tanggal)})`
-            : 'belum diisi pada periode ini'}
+            ? `${r.obat.mars.total}/25 ${r.obat.mars.kategori} (${tanggalPendek(r.obat.mars.tanggal)})`
+            : 'belum diisi'}
         </Text>
         {r.obat.alasan.map((a) => (
           <Text key={a.id} style={styles.item}>
-            • {tanggalPendek(a.tanggal)}: {a.teks}
+            • Alasan: {tanggalPendek(a.tanggal)} {a.teks}
           </Text>
         ))}
-        {r.obat.riwayat.length > 0 && (
-          <View style={styles.grup}>
-            <Text style={styles.grupJudul}>Perubahan obat</Text>
-            {r.obat.riwayat.map((h) => (
-              <Text key={h.id} style={styles.item}>
-                • {tanggalPendek(h.tanggal)}: {h.teks}
-              </Text>
-            ))}
-          </View>
-        )}
-        <Text style={styles.catatanKecil}>
-          Efek samping belum dikumpulkan secara terstruktur oleh aplikasi.
-        </Text>
       </Card>
 
       <Card>

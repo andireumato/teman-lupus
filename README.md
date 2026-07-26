@@ -220,10 +220,16 @@ di `medication_events` (`mulai` / `stop` / `lanjut`) — bukan sekadar kolom
 tanggal di `medications`, supaya obat yang berkali-kali dihentikan dan
 dilanjutkan tetap terekam utuh.
 
-Bagian 4 ringkasan pra-kunjungan menampilkan riwayat itu sebagai "Perubahan
-obat", dan tetap melaporkan obat yang **sudah dihentikan** selama masih ada
-jejaknya pada periode itu — obat yang distop kemarin justru yang penting dibawa
-ke kontrol.
+Bagian 4 ringkasan pra-kunjungan tetap melaporkan obat yang **sudah
+dihentikan** selama masih ada jejaknya pada periode itu — obat yang distop
+kemarin justru yang penting dibawa ke kontrol.
+
+Bagian itu sengaja dipadatkan: **satu baris per obat**, dan tanggal
+perubahannya menempel pada obatnya (`stop 12 Jul 2026, lanjut 20 Jul 2026`),
+bukan jadi daftar terpisah — pembaca butuh tahu obat *mana* yang berubah, bukan
+mengurutkan sendiri dua daftar. Keterbatasan "efek samping belum dicatat
+terstruktur" cukup disebut sekali di judul bagian, bukan sebagai baris
+tersendiri: ia bercerita tentang aplikasi, bukan tentang pasien.
 
 ### Grafik di layar Tren
 

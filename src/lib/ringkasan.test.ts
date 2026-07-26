@@ -541,7 +541,15 @@ describe('kepatuhan obat', () => {
       })
     );
     expect(r.obat.daftar).toEqual([
-      { id: 'm1', nama: 'Hidroksiklorokuin', frekuensi: 1, aktif: true, terlewat: 2, diminum: 1 },
+      {
+        id: 'm1',
+        nama: 'Hidroksiklorokuin',
+        frekuensi: 1,
+        aktif: true,
+        perubahan: '',
+        terlewat: 2,
+        diminum: 1,
+      },
     ]);
     expect(r.obat.hariTanpaCatatan).toBe(27);
   });
@@ -570,6 +578,7 @@ describe('kepatuhan obat', () => {
       nama: 'Metilprednisolon',
       frekuensi: 3,
       aktif: true,
+      perubahan: '',
       terlewat: 1,
       diminum: 2,
     });
@@ -585,13 +594,8 @@ describe('kepatuhan obat', () => {
         ],
       })
     );
-    // id-nya id baris event; yang diuji di sini isinya.
-    expect(r.obat.riwayat.map(({ tanggal, teks }) => ({ tanggal, teks }))).toEqual([
-      { tanggal: '2026-07-12', teks: 'Berhenti Prednison — perut perih' },
-      { tanggal: '2026-07-20', teks: 'Dilanjutkan lagi Prednison' },
-    ]);
-    // Kunci React di layar memakai id ini, jadi harus ada & berbeda.
-    expect(new Set(r.obat.riwayat.map((h) => h.id)).size).toBe(2);
+    // Perubahan menempel pada obatnya, bukan jadi daftar terpisah.
+    expect(r.obat.daftar[0].perubahan).toBe('stop 12 Jul 2026 (perut perih), lanjut 20 Jul 2026');
   });
 
   it('obat yang dihentikan tetap dilaporkan bila ada jejaknya di periode ini', () => {
@@ -617,7 +621,6 @@ describe('kepatuhan obat', () => {
     );
     expect(r.obat.daftar).toHaveLength(2);
     expect(new Set(r.obat.daftar.map((o) => o.id)).size).toBe(2);
-    expect(new Set(r.obat.riwayat.map((h) => h.id)).size).toBe(2);
   });
 
   it('obat lama tanpa jejak di periode ini tidak ikut dilaporkan', () => {
@@ -628,7 +631,6 @@ describe('kepatuhan obat', () => {
       })
     );
     expect(r.obat.daftar).toEqual([]);
-    expect(r.obat.riwayat).toEqual([]);
   });
 
   it('mengambil MARS-5 terbaru di dalam periode saja', () => {
@@ -767,7 +769,7 @@ describe('ringkasanTeks', () => {
       '1. SKOR HARIAN',
       '2. GEJALA MENONJOL',
       '3. PERUBAHAN & WAKTUNYA',
-      '4. KEPATUHAN & EFEK SAMPING OBAT',
+      '4. OBAT',
       '5. EVENT RED-FLAG',
       '6. PERTANYAAN / KEKHAWATIRAN PASIEN',
       '7. PEMANTAUAN',

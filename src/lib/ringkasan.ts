@@ -91,6 +91,13 @@ export interface ObatTerlewat {
   diminum: number;
   /** False bila obat sudah dihentikan. */
   aktif: boolean;
+  /**
+   * Perubahan obat pada periode ini, sudah diringkas jadi satu frasa
+   * ("stop 12 Jul 2026, lanjut 20 Jul 2026"). Menempel pada obatnya, bukan
+   * jadi daftar terpisah: pembaca ringkasan butuh tahu obat MANA yang
+   * berubah, bukan mengurutkan sendiri dua daftar.
+   */
+  perubahan: string;
 }
 
 export interface EventRedFlag {
@@ -126,8 +133,6 @@ export interface Ringkasan {
     mars: { tanggal: string; total: number; kategori: string } | null;
     /** Alasan bebas yang ditulis pasien di catatan minum obat. */
     alasan: { id: string; tanggal: string; teks: string }[];
-    /** Obat yang mulai, dihentikan, atau dilanjutkan pada periode ini. */
-    riwayat: { id: string; tanggal: string; teks: string }[];
   };
   redflag: EventRedFlag[];
   pertanyaan: {
@@ -580,9 +585,9 @@ function perubahanTerkini(rows: DailyCheckin[], dari: string, sampai: string): s
 // ---------- 4. Obat ----------
 
 const KATA_EVENT: Record<MedicationEvent['jenis'], string> = {
-  mulai: 'Mulai',
-  stop: 'Berhenti',
-  lanjut: 'Dilanjutkan lagi',
+  mulai: 'mulai',
+  stop: 'stop',
+  lanjut: 'lanjut',
 };
 
 function ringkasObat(
@@ -600,20 +605,23 @@ function ringkasObat(
     .filter((e) => e.tanggal >= dari && e.tanggal <= sampai)
     .sort((a, b) => a.tanggal.localeCompare(b.tanggal));
 
-  const riwayat = eventPeriode.map((e) => ({
-    id: e.id,
-    tanggal: e.tanggal,
-    teks: `${KATA_EVENT[e.jenis]} ${namaObat.get(e.medication_id) ?? 'obat'}${
-      e.catatan ? ` — ${e.catatan.trim()}` : ''
-    }`,
-  }));
-
   // Obat yang dihentikan tetap dilaporkan bila masih ada jejaknya pada periode
   // ini: kalau tidak, obat yang baru distop kemarin akan hilang dari ringkasan
   // yang justru dibawa ke kontrol.
   const adaJejak = (id: string) =>
     dalamPeriode.some((l) => l.medication_id === id) ||
     eventPeriode.some((e) => e.medication_id === id);
+
+  const perubahanObat = (id: string) =>
+    eventPeriode
+      .filter((e) => e.medication_id === id)
+      .map(
+        (e) =>
+          `${KATA_EVENT[e.jenis]} ${tanggalPendek(e.tanggal)}${
+            e.catatan ? ` (${e.catatan.trim()})` : ''
+          }`
+      )
+      .join(', ');
 
   const daftar: ObatTerlewat[] = meds
     .filter((m) => m.aktif || adaJejak(m.id))
@@ -624,6 +632,7 @@ function ringkasObat(
         nama: m.nama_obat,
         frekuensi: m.frekuensi ?? 1,
         aktif: m.aktif,
+        perubahan: perubahanObat(m.id),
         terlewat: milik.filter((l) => l.diminum === false).length,
         diminum: milik.filter((l) => l.diminum === true).length,
       };
@@ -657,7 +666,6 @@ function ringkasObat(
           }
         : null,
     alasan,
-    riwayat,
   };
 }
 
@@ -801,35 +809,32 @@ export function ringkasanTeks(r: Ringkasan): string {
   }
   b.push('');
 
-  b.push('4. KEPATUHAN & EFEK SAMPING OBAT');
+  // Sengaja padat: satu baris per obat, tanggal perubahan menempel pada
+  // obatnya, dan tidak ada kalimat yang bercerita tentang aplikasi alih-alih
+  // tentang pasien. Keterbatasan efek samping cukup disebut di judul.
+  b.push('4. OBAT (efek samping belum dicatat terstruktur)');
   if (r.obat.daftar.length === 0) {
-    b.push('   - Belum ada obat terdaftar di aplikasi.');
+    b.push('   - Belum ada obat terdaftar.');
   } else {
     for (const o of r.obat.daftar) {
-      const keterangan = [`${o.frekuensi}x sehari`, o.aktif ? null : 'sudah dihentikan']
-        .filter(Boolean)
-        .join(', ');
+      const bagian = [`${o.diminum} diminum`, `${o.terlewat} terlewat`];
+      if (o.perubahan) bagian.push(o.perubahan);
+      b.push(`   - ${o.nama} (${o.frekuensi}x/hari): ${bagian.join(' · ')}`);
+    }
+    if (r.obat.hariTanpaCatatan > 0) {
       b.push(
-        `   - ${o.nama} (${keterangan}): ${o.terlewat} dosis ditandai belum diminum, ${o.diminum} dosis sudah`
+        `   - ${r.obat.hariTanpaCatatan} dari ${r.kepala.jumlahHari} hari tanpa catatan minum obat`
       );
     }
-    b.push(`   - Hari tanpa catatan minum obat sama sekali: ${r.obat.hariTanpaCatatan}`);
   }
-  for (const h of r.obat.riwayat) {
-    b.push(`   - ${tanggalPendek(h.tanggal)}: ${h.teks}`);
+  b.push(
+    r.obat.mars
+      ? `   - MARS-5: ${r.obat.mars.total}/25 ${r.obat.mars.kategori} (${tanggalPendek(r.obat.mars.tanggal)})`
+      : '   - MARS-5: belum diisi'
+  );
+  for (const a of r.obat.alasan) {
+    b.push(`   - Alasan: ${tanggalPendek(a.tanggal)} ${a.teks}`);
   }
-  if (r.obat.mars) {
-    b.push(
-      `   - MARS-5 (${tanggalPendek(r.obat.mars.tanggal)}): ${r.obat.mars.total}/25 · ${r.obat.mars.kategori}`
-    );
-  } else {
-    b.push('   - MARS-5: belum diisi pada periode ini');
-  }
-  if (r.obat.alasan.length > 0) {
-    for (const a of r.obat.alasan)
-      b.push(`   - Alasan tercatat ${tanggalPendek(a.tanggal)}: ${a.teks}`);
-  }
-  b.push('   - Efek samping belum dikumpulkan secara terstruktur oleh aplikasi.');
   b.push('');
 
   b.push('5. EVENT RED-FLAG');
