@@ -21,13 +21,20 @@ tabel `lab_results` dan kolom `profiles.consent_at` / `consent_version` **sudah
 ada** di sana. SQL di `supabase/` tetap disimpan sebagai dokumentasi dan aman
 dijalankan ulang bila suatu saat perlu menyiapkan project baru.
 
-> **Satu hal belum terverifikasi:** unique constraint `(patient_id, tanggal)`
-> pada `daily_checkins`. Aplikasi menyimpan check-in dengan upsert
-> (`onConflict: patient_id,tanggal`); tanpa constraint itu, penyimpanan akan
-> gagal. Constraint tidak terlihat lewat REST API — perlu akses SQL
-> (`supabase login` → `supabase link`) untuk memeriksanya. Bila belum ada,
-> jalankan `supabase/unique_checkin_per_hari.sql` (baca komentarnya dulu:
-> ada query untuk mendeteksi duplikat sebelum constraint dipasang).
+Unique constraint `(patient_id, tanggal)` pada `daily_checkins` semula tidak ada
+— tabel hanya punya primary key di `id`, karena prototipe web memakai `insert`
+biasa dan tidak membutuhkannya. Constraint ini **sudah dipasang** (26 Juli 2026)
+lewat Dashboard SQL Editor, tanpa duplikat yang perlu dibersihkan:
+
+```sql
+alter table public.daily_checkins
+  add constraint daily_checkins_patient_tanggal_key unique (patient_id, tanggal);
+```
+
+Aplikasi ini menyimpan check-in dengan upsert (`onConflict: patient_id,tanggal`)
+sehingga mengisi ulang di hari yang sama **memperbarui** baris, bukan menambah
+baris baru. Kalau suatu saat constraint ini hilang, penyimpanan check-in akan
+gagal.
 
 Bila suatu saat perlu menyiapkan project Supabase dari nol:
 
