@@ -31,10 +31,12 @@ alter table public.daily_checkins
   add constraint daily_checkins_patient_tanggal_key unique (patient_id, tanggal);
 ```
 
-Tabel `visit_questions` **belum ada** di project ini (dicek 26 Juli 2026,
-REST menjawab `PGRST205`). Jalankan `supabase/visit_questions.sql` di Dashboard
-→ SQL Editor. Sebelum itu, bagian "Pertanyaan untuk dokter" di layar ringkasan
-akan menampilkan pesan bahwa tabelnya belum dibuat.
+Tabel `visit_questions` **sudah dibuat** (26 Juli 2026) lewat Dashboard SQL
+Editor dengan isi `supabase/visit_questions.sql` apa adanya. Diverifikasi lewat
+REST: tabel terbaca (HTTP 200) dan RLS aktif — insert tanpa login ditolak
+`42501`. Bila suatu saat tabelnya hilang, bagian "Pertanyaan untuk dokter" di
+layar ringkasan menampilkan pesan yang menyebut nama file SQL-nya, sementara
+enam bagian ringkasan lain tetap jalan.
 
 Aplikasi ini menyimpan check-in dengan upsert (`onConflict: patient_id,tanggal`)
 sehingga mengisi ulang di hari yang sama **memperbarui** baris, bukan menambah
