@@ -31,6 +31,19 @@ import type { DailyCheckin, SymptomEntry } from '@/types/database';
 /** Kunci unik gejala: "sistem|item". */
 const key = (system: string, item: string) => `${system}|${item}`;
 
+/**
+ * Nilai yang tidak ada lagi di skala sekarang dikosongkan, bukan dipaksa
+ * turun ke tingkat terdekat.
+ *
+ * Kasusnya: check-in hari ini sempat diisi "Sangat berat" (kelelahan = 4) di
+ * versi aplikasi sebelumnya. Kalau nilainya dibiarkan, formulir tampil tanpa
+ * pilihan tersorot tetapi tetap menyimpan ulang 4 diam-diam saat diperbarui.
+ * Mengosongkannya memaksa pasien menjawab lagi dengan skala yang berlaku.
+ */
+function dalamSkala(v: number | null, opsi: { v: number }[]): number | null {
+  return v != null && opsi.some((o) => o.v === v) ? v : null;
+}
+
 export default function CheckinFormScreen() {
   const { patientId } = useSession();
   const router = useRouter();
@@ -72,8 +85,8 @@ export default function CheckinFormScreen() {
       if (row) {
         setSudahIsi(true);
         setMood(row.mood);
-        setLelah(row.lelah);
-        setNyeri(row.nyeri_sendi);
+        setLelah(dalamSkala(row.lelah, SKALA_LELAH));
+        setNyeri(dalamSkala(row.nyeri_sendi, SKALA_NYERI_SENDI));
         setCatatan(row.catatan ?? '');
         setGejala(
           new Set((row.gejala ?? []).filter((g) => g.present).map((g) => key(g.system, g.item)))

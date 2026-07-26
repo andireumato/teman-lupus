@@ -138,7 +138,7 @@ export function Field({
   );
 }
 
-/** Deretan pilihan tunggal (mis. skala 0–4). */
+/** Deretan pilihan tunggal berjajar (mis. skala 0–3 tanpa keterangan). */
 export function Segmented<T extends string | number>({
   options,
   value,

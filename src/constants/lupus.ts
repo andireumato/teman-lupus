@@ -141,8 +141,15 @@ export interface OpsiSkala {
  * bukan seberapa "capek" rasanya, supaya penilaian pasien konsisten antar
  * hari dan antar pasien.
  *
- * ⚠️ Tingkat 4 ("Sangat berat") belum punya patokan. Selama belum ada,
- * pasien bisa memilihnya tanpa tahu bedanya dengan "Berat".
+ * Tingkat "Sangat berat" (nilai 4) DIHAPUS 27 Juli 2026: patokan "Berat" sudah
+ * mencakup pasien yang sebagian besar harinya berbaring, jadi tidak ada ruang
+ * bermakna di atasnya — dan tingkat tanpa patokan membuat data antar pasien
+ * tidak sebanding. Skalanya kini 0–3, sama panjang dengan nyeri sendi.
+ *
+ * Constraint database sengaja dibiarkan `between 0 and 4`: 0–3 tetap sah, dan
+ * baris lama bernilai 4 tidak perlu diubah. Yang menanganinya ada di sisi
+ * aplikasi — lihat `checkin.tsx` (nilai di luar skala dikosongkan agar tidak
+ * tersimpan ulang diam-diam) dan `BarChart` di `tren.tsx` (tinggi bar dibatasi).
  */
 export const SKALA_LELAH: OpsiSkala[] = [
   { v: 0, label: 'Tidak ada' },
@@ -161,7 +168,6 @@ export const SKALA_LELAH: OpsiSkala[] = [
     label: 'Berat',
     ket: 'Lelah sampai kesulitan mengurus diri sendiri (mandi, berpakaian, makan); sebagian besar hari dihabiskan berbaring.',
   },
-  { v: 4, label: 'Sangat berat' },
 ];
 
 export const SKALA_NYERI_SENDI = [

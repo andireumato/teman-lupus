@@ -66,7 +66,7 @@ npm start                 # lalu tekan i (iOS) / a (Android), atau pindai QR den
 
 | Perintah            | Fungsi                                         |
 | ------------------- | ---------------------------------------------- |
-| `npm test`          | Unit test (red-flag, ringkasan, MARS-5, UV, beranda, tanggal) — 142 test |
+| `npm test`          | Unit test (red-flag, ringkasan, MARS-5, UV, beranda, tanggal) — 148 test |
 | `npm run typecheck` | Cek tipe TypeScript                            |
 | `npm run lint`      | ESLint + Prettier                              |
 | `npm run format`    | Rapikan format kode                            |
@@ -145,9 +145,21 @@ ringkasan pra-kunjungan berarti sama bagi semua orang.
 Karena butuh ruang untuk kalimat, pilihannya memakai `SegmentedVertical`
 (bertumpuk ke bawah), bukan `Segmented` (berjajar).
 
-> ⚠️ Tingkat 4 ("Sangat berat") **belum punya patokan**, sementara tingkat 1–3
-> sudah. Selama belum ada, pasien bisa memilihnya tanpa tahu bedanya dengan
-> "Berat" — dan data yang dihasilkan tidak sebanding antar pasien.
+Tingkat **"Sangat berat" (nilai 4) dihapus** 27 Juli 2026: patokan "Berat"
+sudah mencakup pasien yang sebagian besar harinya berbaring, jadi tidak ada
+ruang bermakna di atasnya — dan tingkat tanpa patokan membuat data antar pasien
+tidak sebanding. Skalanya kini **0–3**, sama panjang dengan nyeri sendi.
+
+Constraint database sengaja dibiarkan `lelah between 0 and 4`: 0–3 tetap sah
+dan baris lama bernilai 4 tidak perlu diubah. Yang menanganinya di sisi
+aplikasi:
+
+- `checkin.tsx` — nilai di luar skala dikosongkan saat formulir dibuka, supaya
+  tidak tersimpan ulang diam-diam sementara layarnya tampak tanpa pilihan.
+- `BarChart` di `tren.tsx` — tinggi bar dibatasi 100% agar nilai 4 tidak
+  meluber keluar kolomnya.
+- Hitungan di ringkasan memakai `≥`, jadi baris lama bernilai 4 tetap terhitung
+  sebagai kelelahan berat.
 
 ### Catatan dua prototipe
 

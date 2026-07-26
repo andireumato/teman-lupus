@@ -64,7 +64,7 @@ export type DailyCheckin = {
   tanggal: string;
   /** 1–5 */
   mood: number | null;
-  /** 0–4 */
+  /** 0–3. Nilai 4 ("Sangat berat") dipakai versi lama, lihat SKALA_LELAH. */
   lelah: number | null;
   /** 0–3 */
   nyeri_sendi: number | null;

@@ -193,7 +193,7 @@ function tengahPeriode(dari: string, sampai: string): string {
 
 const SKALA: { key: 'mood' | 'lelah' | 'nyeri_sendi'; label: string; maks: number }[] = [
   { key: 'mood', label: 'Mood (1–5, makin tinggi makin baik)', maks: 5 },
-  { key: 'lelah', label: 'Kelelahan (0–4, makin tinggi makin berat)', maks: 4 },
+  { key: 'lelah', label: 'Kelelahan (0–3, makin tinggi makin berat)', maks: 3 },
   { key: 'nyeri_sendi', label: 'Nyeri sendi (0–3, makin tinggi makin berat)', maks: 3 },
 ];
 
@@ -342,8 +342,8 @@ function gejalaMenonjol(
  * kapan datanya kosong.
  *
  * Aturan yang sengaja dipegang:
- * - Tidak ada skor gabungan. Versi pertama menjumlahkan kelelahan (0–4) dan
- *   nyeri sendi (0–3) menjadi "skor beban" 0–7 — angka yang tampak objektif
+ * - Tidak ada skor gabungan. Versi pertama menjumlahkan kelelahan dan
+ *   nyeri sendi menjadi satu "skor beban" — angka yang tampak objektif
  *   tetapi tidak punya padanan klinis apa pun. Semua kalimat sekarang memakai
  *   skala asli yang diisi pasien, lengkap dengan ambangnya.
  * - Satuannya HARI KALENDER, bukan jumlah check-in. "Naik 4 check-in
@@ -359,7 +359,11 @@ function gejalaMenonjol(
 
 /** Nyeri sendi (skala 0–3): 2 = sedang, 3 = berat. */
 const AMBANG_NYERI = 2;
-/** Kelelahan (skala 0–4): 3 = berat, 4 = sangat berat. */
+/**
+ * Kelelahan (skala 0–3): 3 = berat.
+ * ⚠️ Ambang ini menghitung tingkat teratas saja, sementara nyeri sendi
+ * menghitung dua tingkat teratas (sedang + berat) — belum tentu disengaja.
+ */
 const AMBANG_LELAH = 3;
 /** Mood (skala 1–5): 1 = sangat buruk, 2 = buruk. */
 const AMBANG_MOOD = 2;

@@ -51,7 +51,10 @@ function BarChart({
                 style={[
                   styles.bar,
                   {
-                    height: `${Math.max(4, (d.nilai / max) * 100)}%`,
+                    // Dibatasi 100%: baris lama bisa memakai skala yang sudah
+                    // dipendekkan (mis. kelelahan 4 sebelum "Sangat berat"
+                    // dihapus) dan akan meluber keluar kolomnya.
+                    height: `${Math.min(100, Math.max(4, (d.nilai / max) * 100))}%`,
                     backgroundColor: warna,
                   },
                 ]}
@@ -167,7 +170,7 @@ export default function TrenScreen() {
       <Card>
         <SectionLabel>14 hari terakhir</SectionLabel>
         <BarChart data={dataMood} max={5} warna={Brand.ungu} label="Mood (1–5)" />
-        <BarChart data={dataLelah} max={4} warna={Brand.kuning} label="Kelelahan (0–4)" />
+        <BarChart data={dataLelah} max={3} warna={Brand.kuning} label="Kelelahan (0–3)" />
         <BarChart data={dataNyeri} max={3} warna={Brand.merah} label="Nyeri sendi (0–3)" />
       </Card>
 
