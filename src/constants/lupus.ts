@@ -128,11 +128,39 @@ export const SKALA_MOOD = [
   { v: 5, label: 'Sangat baik' },
 ];
 
-export const SKALA_LELAH = [
+export interface OpsiSkala {
+  v: number;
+  label: string;
+  /** Keterangan pendek di bawah label, bila ada. */
+  ket?: string;
+}
+
+/**
+ * Patokan tiap tingkat kelelahan ditulis reumatolog penanggung jawab
+ * (27 Juli 2026). Sengaja berbasis FUNGSI — apa yang masih bisa dikerjakan —
+ * bukan seberapa "capek" rasanya, supaya penilaian pasien konsisten antar
+ * hari dan antar pasien.
+ *
+ * ⚠️ Tingkat 4 ("Sangat berat") belum punya patokan. Selama belum ada,
+ * pasien bisa memilihnya tanpa tahu bedanya dengan "Berat".
+ */
+export const SKALA_LELAH: OpsiSkala[] = [
   { v: 0, label: 'Tidak ada' },
-  { v: 1, label: 'Ringan' },
-  { v: 2, label: 'Sedang' },
-  { v: 3, label: 'Berat' },
+  {
+    v: 1,
+    label: 'Ringan',
+    ket: 'Lelah, tapi hilang setelah istirahat; aktivitas harian normal tetap jalan.',
+  },
+  {
+    v: 2,
+    label: 'Sedang',
+    ket: 'Lelah tidak hilang dengan istirahat; pekerjaan rumah/kantor, belanja, atau ibadah jadi terganggu atau harus dikurangi.',
+  },
+  {
+    v: 3,
+    label: 'Berat',
+    ket: 'Lelah sampai kesulitan mengurus diri sendiri (mandi, berpakaian, makan); sebagian besar hari dihabiskan berbaring.',
+  },
   { v: 4, label: 'Sangat berat' },
 ];
 

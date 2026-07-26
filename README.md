@@ -133,6 +133,22 @@ insight personal.
 Kutipan dan tips berputar berdasarkan hari-ke-berapa dalam setahun, jadi semua
 pasien melihat konten yang sama pada hari yang sama.
 
+### Patokan skala kelelahan
+
+Tingkat kelelahan di formulir check-in punya keterangan pendek di bawah tiap
+pilihan (`SKALA_LELAH` di `src/constants/lupus.ts`), ditulis reumatolog
+penanggung jawab. Patokannya sengaja berbasis **fungsi** — apa yang masih bisa
+dikerjakan pasien — bukan seberapa "capek" rasanya, supaya penilaiannya
+konsisten antar hari dan antar pasien, dan supaya hitungan di bagian 3
+ringkasan pra-kunjungan berarti sama bagi semua orang.
+
+Karena butuh ruang untuk kalimat, pilihannya memakai `SegmentedVertical`
+(bertumpuk ke bawah), bukan `Segmented` (berjajar).
+
+> ⚠️ Tingkat 4 ("Sangat berat") **belum punya patokan**, sementara tingkat 1–3
+> sudah. Selama belum ada, pasien bisa memilihnya tanpa tahu bedanya dengan
+> "Berat" — dan data yang dihasilkan tidak sebanding antar pasien.
+
 ### Catatan dua prototipe
 
 `docs/` menyimpan dua snapshot web. Yang **16 Juli** adalah acuan tampilan yang

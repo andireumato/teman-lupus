@@ -170,6 +170,44 @@ export function Segmented<T extends string | number>({
   );
 }
 
+/**
+ * Pilihan tunggal bertumpuk ke bawah, tiap baris boleh punya keterangan.
+ *
+ * Dipakai untuk skala yang tingkatannya perlu dijelaskan (mis. kelelahan):
+ * lima pilihan berjajar seperti `Segmented` tidak menyisakan ruang untuk
+ * kalimat patokan, dan patokan itulah yang membuat jawaban pasien konsisten.
+ */
+export function SegmentedVertical<T extends string | number>({
+  options,
+  value,
+  onChange,
+}: {
+  options: { v: T; label: string; ket?: string }[];
+  value: T | null;
+  onChange: (v: T) => void;
+}) {
+  return (
+    <View style={styles.segVList}>
+      {options.map((o) => {
+        const on = value === o.v;
+        return (
+          <Pressable
+            key={String(o.v)}
+            accessibilityRole="radio"
+            accessibilityState={{ selected: on }}
+            accessibilityLabel={o.ket ? `${o.label}. ${o.ket}` : o.label}
+            onPress={() => onChange(o.v)}
+            style={[styles.segVItem, on && styles.segVItemOn]}
+          >
+            <Text style={[styles.segVLabel, on && styles.segVLabelOn]}>{o.label}</Text>
+            {o.ket && <Text style={[styles.segVKet, on && styles.segVKetOn]}>{o.ket}</Text>}
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
 /** Pilihan ganda berbentuk chip (mis. daftar gejala). */
 export function Chip({
   label,
@@ -283,6 +321,25 @@ const styles = StyleSheet.create({
   segItemOn: { backgroundColor: Brand.ungu, borderColor: Brand.ungu },
   segText: { fontSize: 11.5, color: '#374151', textAlign: 'center' },
   segTextOn: { color: '#fff', fontWeight: '700' },
+  segVList: { gap: 6 },
+  segVItem: {
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: radius.md,
+    paddingVertical: 10,
+    paddingHorizontal: space.md,
+    backgroundColor: '#fff',
+    minHeight: 46,
+    justifyContent: 'center',
+    gap: 2,
+  },
+  // Latar dibuat lembut, bukan ungu penuh seperti Segmented: teks keterangan
+  // di baris terpilih harus tetap terbaca.
+  segVItemOn: { backgroundColor: Brand.unguMuda, borderColor: Brand.ungu },
+  segVLabel: { fontSize: 14, fontWeight: '600', color: '#374151' },
+  segVLabelOn: { color: Brand.ungu, fontWeight: '700' },
+  segVKet: { fontSize: 11.5, color: Brand.teksLembut, lineHeight: 16 },
+  segVKetOn: { color: '#5b5566' },
   chipGroup: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   chip: {
     borderWidth: 1,

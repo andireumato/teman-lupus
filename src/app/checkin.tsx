@@ -17,6 +17,7 @@ import {
   Screen,
   SectionLabel,
   Segmented,
+  SegmentedVertical,
 } from '@/components/ui/kit';
 import { Brand, space } from '@/constants/brand';
 import { DISCLAIMER } from '@/constants/consent';
@@ -185,7 +186,7 @@ export default function CheckinFormScreen() {
         <MoodScale value={mood} onChange={setMood} />
 
         <SectionLabel>Kelelahan</SectionLabel>
-        <Segmented options={SKALA_LELAH} value={lelah} onChange={setLelah} />
+        <SegmentedVertical options={SKALA_LELAH} value={lelah} onChange={setLelah} />
 
         <SectionLabel>Nyeri sendi</SectionLabel>
         <Segmented options={SKALA_NYERI_SENDI} value={nyeri} onChange={setNyeri} />
