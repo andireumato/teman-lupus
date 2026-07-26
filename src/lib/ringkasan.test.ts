@@ -305,70 +305,179 @@ describe('pengelompokan gejala', () => {
   });
 });
 
-// ---------- 3. Indikator ----------
+// ---------- 3. Perubahan & waktunya ----------
+//
+// Periode uji 1–30 Juli → jendela 14 hari: terkini 17–30 Juli,
+// pembanding 3–16 Juli.
 
-describe('indikator (pengamatan)', () => {
-  it('mencatat kenaikan beban beruntun', () => {
+describe('perubahan & waktunya', () => {
+  const cari = (r: ReturnType<typeof buatRingkasan>, potongan: string) =>
+    r.perubahan.find((p) => p.includes(potongan));
+
+  it('menghitung hari dalam skala asli, bukan skor gabungan', () => {
     const r = buatRingkasan(
       input({
         checkins: [
-          checkin({ tanggal: '2026-07-20', lelah: 0, nyeri_sendi: 0 }),
-          checkin({ tanggal: '2026-07-21', lelah: 1, nyeri_sendi: 0 }),
-          checkin({ tanggal: '2026-07-22', lelah: 2, nyeri_sendi: 1 }),
-          checkin({ tanggal: '2026-07-23', lelah: 3, nyeri_sendi: 2 }),
+          checkin({ tanggal: '2026-07-05', nyeri_sendi: 2 }),
+          checkin({ tanggal: '2026-07-20', nyeri_sendi: 2 }),
+          checkin({ tanggal: '2026-07-21', nyeri_sendi: 3 }),
+          checkin({ tanggal: '2026-07-22', nyeri_sendi: 2 }),
         ],
       })
     );
-    expect(r.indikator.some((i) => i.includes('4 check-in berturut-turut'))).toBe(true);
+    expect(cari(r, 'Nyeri sendi sedang–berat')).toBe(
+      'Nyeri sendi sedang–berat (≥2): 3 dari 14 hari terakhir, sebelumnya 1 dari 14 hari.'
+    );
+    // Skala kelelahan & nyeri tidak boleh dijumlahkan jadi angka karangan.
+    expect(r.perubahan.some((p) => /beban/i.test(p))).toBe(false);
   });
 
-  it('beban yang naik-turun tidak dianggap beruntun', () => {
+  it('metrik yang nol di kedua jendela tidak ditampilkan', () => {
+    const r = buatRingkasan(
+      input({ checkins: [checkin({ tanggal: '2026-07-20', mood: 5, nyeri_sendi: 0, lelah: 0 })] })
+    );
+    expect(r.perubahan.some((p) => p.startsWith('Mood buruk'))).toBe(false);
+    expect(r.perubahan.some((p) => p.startsWith('Nyeri sendi'))).toBe(false);
+  });
+
+  it('menyebut tanggal mulai memberat dari hari berturut-turut', () => {
     const r = buatRingkasan(
       input({
         checkins: [
-          checkin({ tanggal: '2026-07-20', lelah: 2, nyeri_sendi: 1 }),
-          checkin({ tanggal: '2026-07-21', lelah: 1, nyeri_sendi: 1 }),
-          checkin({ tanggal: '2026-07-22', lelah: 2, nyeri_sendi: 1 }),
+          checkin({ tanggal: '2026-07-19', nyeri_sendi: 1 }),
+          checkin({ tanggal: '2026-07-20', nyeri_sendi: 2 }),
+          checkin({ tanggal: '2026-07-21', nyeri_sendi: 2 }),
+          checkin({ tanggal: '2026-07-22', nyeri_sendi: 3 }),
         ],
       })
     );
-    expect(r.indikator.some((i) => i.includes('berturut-turut'))).toBe(false);
+    expect(cari(r, 'Mulai memberat')).toBe(
+      'Mulai memberat sekitar 20 Jul 2026 — hari pertama dari 3 hari berturut-turut dengan nyeri sendi ≥2.'
+    );
   });
 
-  it('menyebut jumlah sistem organ ketika gejala memberat bersamaan', () => {
+  it('rentetan dihitung per hari kalender, bukan per check-in', () => {
+    // Tiga check-in dengan nyeri berat, tetapi terpaut seminggu — bukan
+    // "3 hari berturut-turut".
+    const r = buatRingkasan(
+      input({
+        checkins: [
+          checkin({ tanggal: '2026-07-10', nyeri_sendi: 3 }),
+          checkin({ tanggal: '2026-07-17', nyeri_sendi: 3 }),
+          checkin({ tanggal: '2026-07-24', nyeri_sendi: 3 }),
+        ],
+      })
+    );
+    expect(cari(r, 'Mulai memberat')).toBeUndefined();
+  });
+
+  it('rentetan yang dilaporkan adalah yang terakhir', () => {
+    const r = buatRingkasan(
+      input({
+        checkins: [
+          checkin({ tanggal: '2026-07-03', nyeri_sendi: 2 }),
+          checkin({ tanggal: '2026-07-04', nyeri_sendi: 2 }),
+          checkin({ tanggal: '2026-07-05', nyeri_sendi: 2 }),
+          checkin({ tanggal: '2026-07-06', nyeri_sendi: 0 }),
+          checkin({ tanggal: '2026-07-20', nyeri_sendi: 2 }),
+          checkin({ tanggal: '2026-07-21', nyeri_sendi: 2 }),
+          checkin({ tanggal: '2026-07-22', nyeri_sendi: 2 }),
+          checkin({ tanggal: '2026-07-23', nyeri_sendi: 2 }),
+        ],
+      })
+    );
+    expect(cari(r, 'Mulai memberat')).toContain('20 Jul 2026');
+    expect(cari(r, 'Mulai memberat')).toContain('4 hari berturut-turut');
+  });
+
+  it('menyebut gejala yang muncul bersamaan dari sistem organ berbeda', () => {
     const r = buatRingkasan(
       input({
         checkins: [
           checkin({ tanggal: '2026-07-02', gejala: [] }),
+          checkin({ tanggal: '2026-07-20', gejala: [gejala('ginjal', 'Urin berbusa')] }),
           checkin({
-            tanggal: '2026-07-25',
+            tanggal: '2026-07-22',
             gejala: [gejala('ginjal', 'Urin berbusa'), gejala('saraf', 'Sakit kepala hebat')],
           }),
         ],
       })
     );
-    expect(r.indikator.some((i) => i.includes('2 sistem organ'))).toBe(true);
+    const baris = cari(r, 'Muncul bersamaan')!;
+    expect(baris).toContain('20 Jul 2026');
+    expect(baris).toContain('Urin berbusa (Ginjal)');
+    expect(baris).toContain('Sakit kepala hebat (Saraf)');
   });
 
-  it('merangkum jumlah peringatan Cek Flare', () => {
+  it('gejala yang sudah ada sejak check-in pertama tidak disebut muncul', () => {
+    // Tanpa hari pembanding yang menunjukkan gejalanya belum ada, "muncul"
+    // tidak terbukti.
     const r = buatRingkasan(
       input({
-        flares: [
-          flare('2026-07-10T10:00:00+07:00', 'red'),
-          flare('2026-07-12T10:00:00+07:00', 'yellow'),
+        checkins: [
+          checkin({
+            tanggal: '2026-07-02',
+            gejala: [gejala('ginjal', 'Urin berbusa'), gejala('saraf', 'Sakit kepala hebat')],
+          }),
+          checkin({
+            tanggal: '2026-07-22',
+            gejala: [gejala('ginjal', 'Urin berbusa'), gejala('saraf', 'Sakit kepala hebat')],
+          }),
         ],
       })
     );
-    expect(r.indikator.some((i) => i.includes('1 tingkat darurat dan 1 tingkat mendesak'))).toBe(
-      true
+    expect(cari(r, 'Muncul bersamaan')).toBeUndefined();
+  });
+
+  it('gejala baru dari satu sistem organ saja belum disebut bersamaan', () => {
+    const r = buatRingkasan(
+      input({
+        checkins: [
+          checkin({ tanggal: '2026-07-02', gejala: [] }),
+          checkin({
+            tanggal: '2026-07-22',
+            gejala: [gejala('sendi', 'Nyeri sendi'), gejala('sendi', 'Bengkak sendi')],
+          }),
+        ],
+      })
+    );
+    expect(cari(r, 'Muncul bersamaan')).toBeUndefined();
+  });
+
+  it('menyebut hari yang tidak terpantau', () => {
+    const r = buatRingkasan(
+      input({
+        checkins: [
+          checkin({ tanggal: '2026-07-20', nyeri_sendi: 2 }),
+          checkin({ tanggal: '2026-07-21', nyeri_sendi: 2 }),
+        ],
+      })
+    );
+    expect(cari(r, 'tanpa check-in')).toBe(
+      '12 dari 14 hari terakhir tanpa check-in — hari itu tidak terpantau, bukan berarti tanpa gejala.'
     );
   });
 
-  it('tanpa pola apa pun, daftar indikator kosong', () => {
+  it('tidak mengulang event Cek Flare yang sudah jadi bagian 5', () => {
     const r = buatRingkasan(
-      input({ checkins: [checkin({ tanggal: '2026-07-15', lelah: 1, nyeri_sendi: 1 })] })
+      input({
+        checkins: [checkin({ tanggal: '2026-07-20', nyeri_sendi: 2 })],
+        flares: [flare('2026-07-20T10:00:00+07:00', 'red')],
+      })
     );
-    expect(r.indikator).toEqual([]);
+    expect(r.perubahan.some((p) => /flare/i.test(p))).toBe(false);
+    expect(r.redflag).toHaveLength(1);
+  });
+
+  it('periode terlalu pendek untuk dua jendela setara → kosong', () => {
+    const r = buatRingkasan(
+      input({
+        dari: '2026-07-26',
+        sampai: '2026-07-30',
+        checkins: [checkin({ tanggal: '2026-07-29', nyeri_sendi: 3 })],
+      })
+    );
+    expect(r.perubahan).toEqual([]);
   });
 });
 
@@ -520,7 +629,7 @@ describe('ringkasanTeks', () => {
       'RINGKASAN PRA-KUNJUNGAN',
       '1. SKOR HARIAN',
       '2. GEJALA MENONJOL',
-      '3. INDIKATOR',
+      '3. PERUBAHAN & WAKTUNYA',
       '4. KEPATUHAN & EFEK SAMPING OBAT',
       '5. EVENT RED-FLAG',
       '6. PERTANYAAN / KEKHAWATIRAN PASIEN',

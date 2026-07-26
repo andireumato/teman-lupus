@@ -321,17 +321,17 @@ export default function RingkasanScreen() {
       </Card>
 
       <Card>
-        <SectionLabel>3. Indikator</SectionLabel>
+        <SectionLabel>3. Perubahan & waktunya</SectionLabel>
         <Text style={styles.catatanKecil}>
-          Pengamatan berangka atas datamu, bukan kesimpulan medis. Bila ada tanda bahaya, gunakan
-          Cek Flare.
+          Hitungan hari dari catatanmu sendiri, bukan kesimpulan medis. Bila ada tanda bahaya,
+          gunakan Cek Flare.
         </Text>
-        {r.indikator.length === 0 ? (
-          <Text style={styles.kosong}>Tidak ada pola menonjol dari data yang tercatat.</Text>
+        {r.perubahan.length === 0 ? (
+          <Text style={styles.kosong}>Data belum cukup untuk membandingkan dua periode.</Text>
         ) : (
-          r.indikator.map((i) => (
-            <Text key={i} style={styles.item}>
-              • {i}
+          r.perubahan.map((p) => (
+            <Text key={p} style={styles.item}>
+              • {p}
             </Text>
           ))
         )}

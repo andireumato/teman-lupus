@@ -101,8 +101,12 @@ export interface Ringkasan {
   };
   skor: TrenSkor[];
   gejala: Record<KategoriGejala, GejalaRingkas[]>;
-  /** Pengamatan berangka, bukan diagnosis. Kosong bila tidak ada pola. */
-  indikator: string[];
+  /**
+   * Kalimat deskriptif dalam satuan asli check-in: hitungan hari, tanggal
+   * mulai memberat, gejala yang muncul bersamaan, dan hari yang tidak
+   * terpantau. Bukan penilaian aktivitas penyakit. Kosong bila tidak ada.
+   */
+  perubahan: string[];
   obat: {
     daftar: ObatTerlewat[];
     /** Hari dalam periode tanpa satu pun catatan minum obat. */
@@ -329,73 +333,180 @@ function gejalaMenonjol(
   return hasil;
 }
 
-// ---------- 3. Indikator (pengamatan) ----------
+// ---------- 3. Perubahan & waktunya ----------
 
-/** Skor beban harian = kelelahan + nyeri sendi. Sama seperti di layar Cek Flare. */
-function beban(r: DailyCheckin): number | null {
-  if (r.lelah == null || r.nyeri_sendi == null) return null;
-  return r.lelah + r.nyeri_sendi;
+/**
+ * Bagian ini menghemat pekerjaan yang kalau tidak ada harus dilakukan dengan
+ * membaca seluruh log: sejak kapan memberat, apa yang muncul bersamaan, dan
+ * kapan datanya kosong.
+ *
+ * Aturan yang sengaja dipegang:
+ * - Tidak ada skor gabungan. Versi pertama menjumlahkan kelelahan (0–4) dan
+ *   nyeri sendi (0–3) menjadi "skor beban" 0–7 — angka yang tampak objektif
+ *   tetapi tidak punya padanan klinis apa pun. Semua kalimat sekarang memakai
+ *   skala asli yang diisi pasien, lengkap dengan ambangnya.
+ * - Satuannya HARI KALENDER, bukan jumlah check-in. "Naik 4 check-in
+ *   berturut-turut" bisa berarti rentang tiga minggu bila pasien jarang
+ *   mengisi; itu menyesatkan.
+ * - Hari tanpa check-in disebut eksplisit. Tidak ada catatan bukan berarti
+ *   tidak ada gejala.
+ * - Tidak mengulang bagian lain: event Cek Flare adalah isi bagian 5.
+ *
+ * ⚠️ Ambang di bawah menentukan kalimat mana yang muncul, jadi wajib direview
+ * reumatolog. Tidak ada tindakan yang dipicu otomatis olehnya.
+ */
+
+/** Nyeri sendi (skala 0–3): 2 = sedang, 3 = berat. */
+const AMBANG_NYERI = 2;
+/** Kelelahan (skala 0–4): 3 = berat, 4 = sangat berat. */
+const AMBANG_LELAH = 3;
+/** Mood (skala 1–5): 1 = sangat buruk, 2 = buruk. */
+const AMBANG_MOOD = 2;
+/** Panjang jendela pembanding, dipotong bila periodenya pendek. */
+const JENDELA_MAKS = 14;
+/** Panjang minimum rentetan hari berturut-turut sebelum disebut "mulai memberat". */
+const MIN_BERUNTUN = 3;
+/** Jarak maksimum antar gejala baru agar disebut muncul bersamaan. */
+const JARAK_BERSAMAAN = 7;
+
+interface Metrik {
+  label: string;
+  /** True bila nilai hari itu memenuhi ambang. */
+  test: (r: DailyCheckin) => boolean;
 }
 
-function indikator(
-  rows: DailyCheckin[],
-  gejala: Record<KategoriGejala, GejalaRingkas[]>,
-  flares: EventRedFlag[],
-  dari: string,
-  sampai: string
-): string[] {
+const METRIK: Metrik[] = [
+  {
+    label: `Nyeri sendi sedang–berat (≥${AMBANG_NYERI})`,
+    test: (r) => r.nyeri_sendi != null && r.nyeri_sendi >= AMBANG_NYERI,
+  },
+  {
+    label: `Kelelahan berat (≥${AMBANG_LELAH})`,
+    test: (r) => r.lelah != null && r.lelah >= AMBANG_LELAH,
+  },
+  {
+    label: `Mood buruk (≤${AMBANG_MOOD})`,
+    test: (r) => r.mood != null && r.mood <= AMBANG_MOOD,
+  },
+];
+
+const dalam = (t: string, awal: string, akhir: string) => t >= awal && t <= akhir;
+
+/**
+ * Rentetan hari kalender berturut-turut dengan nyeri sendi memenuhi ambang.
+ * Mengembalikan rentetan TERAKHIR yang cukup panjang — yang paling relevan
+ * untuk pertanyaan "sejak kapan memberat".
+ */
+function rentetanNyeri(rows: DailyCheckin[]): { mulai: string; panjang: number } | null {
+  let hasil: { mulai: string; panjang: number } | null = null;
+  let mulai: string | null = null;
+  let panjang = 0;
+  let sebelumnya: string | null = null;
+
+  for (const r of rows) {
+    const cocok = r.nyeri_sendi != null && r.nyeri_sendi >= AMBANG_NYERI;
+    const bersambung = sebelumnya != null && selisihHari(sebelumnya, r.tanggal) === 1;
+
+    if (cocok && bersambung && panjang > 0) panjang += 1;
+    else if (cocok) {
+      mulai = r.tanggal;
+      panjang = 1;
+    } else {
+      mulai = null;
+      panjang = 0;
+    }
+
+    if (mulai && panjang >= MIN_BERUNTUN) hasil = { mulai, panjang };
+    sebelumnya = r.tanggal;
+  }
+  return hasil;
+}
+
+/**
+ * Gejala yang pertama kali tercatat berdekatan waktunya, dari ≥2 sistem organ.
+ * Gejala yang sudah ada sejak check-in pertama tidak dihitung — tanpa hari
+ * pembanding yang menunjukkan gejala itu belum ada, "muncul" tidak terbukti.
+ */
+function munculBersamaan(
+  rows: DailyCheckin[]
+): { tanggal: string; daftar: { item: string; sistemLabel: string }[] } | null {
+  if (rows.length === 0) return null;
+  const hariPertama = rows[0].tanggal;
+
+  const pertama = new Map<string, { system: string; item: string; tanggal: string }>();
+  for (const r of rows) {
+    for (const g of r.gejala ?? []) {
+      if (!g.present) continue;
+      const k = `${g.system}|${g.item}`;
+      if (!pertama.has(k)) pertama.set(k, { system: g.system, item: g.item, tanggal: r.tanggal });
+    }
+  }
+
+  const baru = [...pertama.values()]
+    .filter((g) => g.tanggal > hariPertama)
+    .sort((a, b) => a.tanggal.localeCompare(b.tanggal));
+  if (baru.length < 2) return null;
+
+  // Kelompokkan di sekitar kemunculan terbaru.
+  const terbaru = baru[baru.length - 1].tanggal;
+  const batas = mundurHari(terbaru, JARAK_BERSAMAAN - 1);
+  const kelompok = baru.filter((g) => g.tanggal >= batas);
+
+  const sistem = new Set(kelompok.map((g) => g.system));
+  if (kelompok.length < 2 || sistem.size < 2) return null;
+
+  return {
+    tanggal: kelompok[0].tanggal,
+    daftar: kelompok.map((g) => ({
+      item: g.item,
+      sistemLabel: LABEL_SISTEM.get(g.system) ?? g.system,
+    })),
+  };
+}
+
+function perubahanTerkini(rows: DailyCheckin[], dari: string, sampai: string): string[] {
   const out: string[] = [];
+  const jumlahHari = selisihHari(dari, sampai) + 1;
+  const jendela = Math.min(JENDELA_MAKS, Math.floor(jumlahHari / 2));
 
-  const seri = rows.map(beban).filter(isAngka);
-  if (seri.length >= 3) {
-    let naik = 1;
-    for (let i = seri.length - 1; i > 0; i--) {
-      if (seri[i] > seri[i - 1]) naik++;
-      else break;
-    }
-    if (naik >= 3) {
-      out.push(
-        `Skor beban harian (kelelahan + nyeri sendi) naik ${naik} check-in berturut-turut sampai ${tanggalPendek(rows[rows.length - 1].tanggal)}.`
-      );
-    }
-  }
+  // Periode terlalu pendek untuk membandingkan dua jendela yang setara.
+  if (jendela < MIN_BERUNTUN) return out;
 
-  const batas = tengahPeriode(dari, sampai);
-  const bebanAwal = rata(
-    rows
-      .filter((r) => r.tanggal < batas)
-      .map(beban)
-      .filter(isAngka)
-  );
-  const bebanAkhir = rata(
-    rows
-      .filter((r) => r.tanggal >= batas)
-      .map(beban)
-      .filter(isAngka)
-  );
-  if (bebanAwal != null && bebanAkhir != null && Math.abs(bebanAkhir - bebanAwal) >= 1) {
-    const arah = bebanAkhir > bebanAwal ? 'naik' : 'turun';
+  const awalBaru = mundurHari(sampai, jendela - 1);
+  const akhirLama = mundurHari(awalBaru, 1);
+  const awalLama = mundurHari(akhirLama, jendela - 1);
+
+  const hitung = (awal: string, akhir: string, test: Metrik['test']) =>
+    rows.filter((r) => dalam(r.tanggal, awal, akhir) && test(r)).length;
+
+  for (const m of METRIK) {
+    const baru = hitung(awalBaru, sampai, m.test);
+    const lama = hitung(awalLama, akhirLama, m.test);
+    if (baru === 0 && lama === 0) continue;
     out.push(
-      `Rata-rata skor beban harian ${arah} dari ${bulat1(bebanAwal)} (paruh awal) ke ${bulat1(bebanAkhir)} (paruh akhir).`
+      `${m.label}: ${baru} dari ${jendela} hari terakhir, sebelumnya ${lama} dari ${jendela} hari.`
     );
   }
 
-  const memberat = [...gejala.baru, ...gejala.memburuk];
-  const sistem = [...new Set(memberat.map((g) => g.sistemLabel))];
-  if (sistem.length >= 2) {
+  const rentetan = rentetanNyeri(rows);
+  if (rentetan) {
     out.push(
-      `Gejala baru atau makin sering tercatat pada ${sistem.length} sistem organ sekaligus: ${sistem.join(', ')}.`
+      `Mulai memberat sekitar ${tanggalPendek(rentetan.mulai)} — hari pertama dari ${rentetan.panjang} hari berturut-turut dengan nyeri sendi ≥${AMBANG_NYERI}.`
     );
   }
 
-  if (flares.length > 0) {
-    const darurat = flares.filter((f) => f.level === 'darurat').length;
-    const mendesak = flares.length - darurat;
-    const bagian = [
-      darurat > 0 ? `${darurat} tingkat darurat` : null,
-      mendesak > 0 ? `${mendesak} tingkat mendesak` : null,
-    ].filter(Boolean);
-    out.push(`Cek Flare menghasilkan peringatan ${bagian.join(' dan ')} selama periode ini.`);
+  const bersamaan = munculBersamaan(rows);
+  if (bersamaan) {
+    const daftar = bersamaan.daftar.map((g) => `${g.item} (${g.sistemLabel})`).join(', ');
+    out.push(`Muncul bersamaan sejak ${tanggalPendek(bersamaan.tanggal)}: ${daftar}.`);
+  }
+
+  const tercatat = rows.filter((r) => dalam(r.tanggal, awalBaru, sampai)).length;
+  const kosong = jendela - tercatat;
+  if (kosong > 0) {
+    out.push(
+      `${kosong} dari ${jendela} hari terakhir tanpa check-in — hari itu tidak terpantau, bukan berarti tanpa gejala.`
+    );
   }
 
   return out;
@@ -526,7 +637,7 @@ export function buatRingkasan(input: RingkasanInput): Ringkasan {
     },
     skor: trenSkor(rows, dari, sampai),
     gejala,
-    indikator: indikator(rows, gejala, redflag, dari, sampai),
+    perubahan: perubahanTerkini(rows, dari, sampai),
     obat: ringkasObat(input.meds, input.medLogs, input.mars, dari, sampai),
     redflag,
     pertanyaan: {
@@ -583,9 +694,12 @@ export function ringkasanTeks(r: Ringkasan): string {
   b.push(`   - Berkurang: ${daftarGejala(r.gejala.membaik)}`);
   b.push('');
 
-  b.push('3. INDIKATOR (pengamatan atas data, bukan diagnosis)');
-  if (r.indikator.length === 0) b.push('   - Tidak ada pola menonjol dari data yang tercatat.');
-  else for (const i of r.indikator) b.push(`   - ${i}`);
+  b.push('3. PERUBAHAN & WAKTUNYA (deskriptif, bukan penilaian aktivitas penyakit)');
+  if (r.perubahan.length === 0) {
+    b.push('   - Data belum cukup untuk membandingkan dua periode.');
+  } else {
+    for (const p of r.perubahan) b.push(`   - ${p}`);
+  }
   b.push('');
 
   b.push('4. KEPATUHAN & EFEK SAMPING OBAT');

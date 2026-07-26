@@ -66,7 +66,7 @@ npm start                 # lalu tekan i (iOS) / a (Android), atau pindai QR den
 
 | Perintah            | Fungsi                                         |
 | ------------------- | ---------------------------------------------- |
-| `npm test`          | Unit test (red-flag, ringkasan, MARS-5, UV, beranda, tanggal) — 134 test |
+| `npm test`          | Unit test (red-flag, ringkasan, MARS-5, UV, beranda, tanggal) — 140 test |
 | `npm run typecheck` | Cek tipe TypeScript                            |
 | `npm run lint`      | ESLint + Prettier                              |
 | `npm run format`    | Rapikan format kode                            |
@@ -173,13 +173,36 @@ hari terakhir**. Tombol di bawah layar membagikan versi teks satu halaman
 
 Isi layar dan isi teks dirakit dari objek yang sama (`buatRingkasan()` →
 `ringkasanTeks()`), jadi keduanya tidak bisa berbeda. Perakitnya murni tanpa
-I/O — 36 test menutupi setiap aturan pengelompokan.
+I/O — 42 test menutupi setiap aturan pengelompokan.
 
 **Yang dijaga:** ringkasan hanya merangkum apa yang pasien catat. Ia tidak
 menilai aktivitas penyakit, tidak menyebut flare sebagai kesimpulan, dan tidak
-pernah menyinggung dosis. Bagian "Indikator" berisi kalimat berangka
-(mis. "skor beban naik 4 check-in berturut-turut") — pengamatan, bukan pemicu
-tindakan. Satu-satunya jalur eskalasi tetap red-flag engine.
+pernah menyinggung dosis. Bagian 3 berisi kalimat deskriptif dalam satuan asli
+check-in — hitungan hari, bukan pemicu tindakan. Satu-satunya jalur eskalasi
+tetap red-flag engine.
+
+### Bagian 3 — "Perubahan & waktunya"
+
+Tugasnya: menghemat pekerjaan yang kalau tidak ada harus dilakukan dengan
+membaca seluruh log — sejak kapan memberat, apa yang muncul bersamaan, dan
+kapan datanya kosong.
+
+Versi pertama bagian ini bernama "Indikator" dan ditolak saat ditinjau. Empat
+sebabnya, semuanya sudah diperbaiki dan dijaga oleh test:
+
+1. **Skor gabungan karangan.** Kelelahan (0–4) + nyeri sendi (0–3) dijumlahkan
+   jadi "skor beban" 0–7 — angka yang tampak objektif tetapi tidak punya
+   padanan klinis. Sekarang semua kalimat memakai skala asli beserta ambangnya.
+2. **Satuannya check-in, bukan hari.** "Naik 4 check-in berturut-turut" bisa
+   berarti rentang tiga minggu bila pasien jarang mengisi. Sekarang semua
+   hitungan memakai hari kalender, dan rentetan harus benar-benar bersambung.
+3. **Mengulang bagian lain.** Baris jumlah peringatan Cek Flare persis isi
+   bagian 5; sudah dibuang.
+4. **Judul tanpa rujukan.** "Indikator" — indikator apa? Diganti menjadi
+   "Perubahan & waktunya".
+
+Ditambahkan satu hal yang sebelumnya tidak ada: **hari tanpa check-in**
+disebut eksplisit, karena tidak ada catatan bukan berarti tidak ada gejala.
 
 **Penyimpangan yang disengaja dari naskah spesifikasi:**
 
@@ -197,8 +220,14 @@ memicu tindakan apa pun):
   membandingkan seberapa sering ia tercatat di paruh awal vs paruh akhir
   periode. Ambang geser 0,25 (`AMBANG_GESER`).
 - Tren skor harian disebut naik/turun bila selisih rata-rata antar paruh ≥ 0,5.
-- "Skor beban harian" = kelelahan + nyeri sendi, definisi yang sama dengan
-  `memburukBeruntun` di layar Cek Flare.
+- Ambang "menonjol" di bagian 3: nyeri sendi ≥ 2 (sedang–berat), kelelahan ≥ 3
+  (berat), mood ≤ 2 (buruk). Jendela pembandingnya 14 hari terakhir vs 14 hari
+  sebelumnya — dipotong setengah periode bila periodenya lebih pendek.
+- "Mulai memberat" butuh ≥ 3 hari kalender berturut-turut dengan nyeri ≥ 2;
+  yang dilaporkan adalah rentetan terakhir.
+- "Muncul bersamaan" butuh ≥ 2 gejala dari ≥ 2 sistem organ yang pertama
+  tercatat dalam rentang 7 hari, dan gejala yang sudah ada sejak check-in
+  pertama tidak dihitung.
 - Bila salah satu paruh tidak punya check-in sama sekali, gejala **tidak**
   diklaim "baru" atau "berkurang" — dicatat netral sebagai "menetap", karena
   tidak ada pembanding.
