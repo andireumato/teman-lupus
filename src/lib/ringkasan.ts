@@ -346,13 +346,14 @@ function gejalaMenonjol(
 /** Nyeri sendi (skala 0–3): 2 = sedang, 3 = berat. */
 const AMBANG_NYERI = 2;
 /**
- * Kelelahan (skala 0–3): 3 = berat.
- * ⚠️ Ambang ini menghitung tingkat teratas saja, sementara nyeri sendi
- * menghitung dua tingkat teratas (sedang + berat). Sejak kedua skala punya
- * patokan yang sepola — "Sedang" sama-sama berarti kegiatan harus dikurangi —
- * perbedaan ini kemungkinan tidak disengaja dan menunggu keputusan reumatolog.
+ * Kelelahan (skala 0–3): 2 = sedang, 3 = berat.
+ *
+ * Disamakan dengan nyeri sendi atas keputusan reumatolog (27 Juli 2026).
+ * Semula hanya menghitung tingkat teratas, padahal patokan "Sedang" pada
+ * kedua skala sama-sama berarti kegiatan harus dikurangi — sudah bermakna
+ * dan sebelumnya tidak terhitung sama sekali.
  */
-const AMBANG_LELAH = 3;
+const AMBANG_LELAH = 2;
 /** Mood (skala 1–5): 1 = sangat buruk, 2 = buruk. */
 const AMBANG_MOOD = 2;
 /** Panjang jendela pembanding, dipotong bila periodenya pendek. */
@@ -384,7 +385,7 @@ const METRIK: Metrik[] = [
     test: (r) => r.nyeri_sendi != null && r.nyeri_sendi >= AMBANG_NYERI,
   },
   {
-    nama: 'Kelelahan berat',
+    nama: 'Kelelahan sedang–berat',
     min: 0,
     max: 3,
     ambang: AMBANG_LELAH,

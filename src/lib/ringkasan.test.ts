@@ -342,6 +342,18 @@ describe('perubahan & waktunya', () => {
     );
   });
 
+  it('kelelahan dan nyeri sendi memakai ambang yang sama', () => {
+    // "Sedang" pada kedua skala sama-sama berarti kegiatan harus dikurangi,
+    // jadi keduanya dihitung mulai dari 2.
+    const r = buatRingkasan(
+      input({ checkins: [checkin({ tanggal: '2026-07-20', lelah: 2, nyeri_sendi: 2 })] })
+    );
+    expect(cari(r, 'Kelelahan')).toContain('Kelelahan sedang–berat (2–3 dari skala 0–3): 1 dari 1');
+    expect(cari(r, 'Nyeri sendi')).toContain(
+      'Nyeri sendi sedang–berat (2–3 dari skala 0–3): 1 dari 1'
+    );
+  });
+
   it('metrik yang nol di kedua jendela tidak ditampilkan', () => {
     const r = buatRingkasan(
       input({ checkins: [checkin({ tanggal: '2026-07-20', mood: 5, nyeri_sendi: 0, lelah: 0 })] })

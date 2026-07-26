@@ -66,7 +66,7 @@ npm start                 # lalu tekan i (iOS) / a (Android), atau pindai QR den
 
 | Perintah            | Fungsi                                         |
 | ------------------- | ---------------------------------------------- |
-| `npm test`          | Unit test (red-flag, ringkasan, MARS-5, UV, beranda, tanggal) — 168 test |
+| `npm test`          | Unit test (red-flag, ringkasan, MARS-5, UV, beranda, tanggal) — 169 test |
 | `npm run typecheck` | Cek tipe TypeScript                            |
 | `npm run lint`      | ESLint + Prettier                              |
 | `npm run format`    | Rapikan format kode                            |
@@ -279,8 +279,10 @@ memicu tindakan apa pun):
   membandingkan seberapa sering ia tercatat di paruh awal vs paruh akhir
   periode. Ambang geser 0,25 (`AMBANG_GESER`).
 - Tren skor harian disebut naik/turun bila selisih rata-rata antar paruh ≥ 0,5.
-- Ambang "menonjol" di bagian 3: nyeri sendi 2–3 (sedang–berat), kelelahan 3
-  (berat), mood 1–2 (buruk). Labelnya menyebut rentang **dan** skala aslinya
+- Ambang "menonjol" di bagian 3: nyeri sendi 2–3 (sedang–berat), kelelahan 2–3
+  (sedang–berat), mood 1–2 (buruk). Kelelahan semula hanya menghitung tingkat
+  teratas; disamakan dengan nyeri sendi 27 Juli 2026, karena patokan "Sedang"
+  pada kedua skala sama-sama berarti kegiatan harus dikurangi. Labelnya menyebut rentang **dan** skala aslinya
   ("2–3 dari skala 0–3") alih-alih notasi "≥2", yang menuntut pembacanya tahu
   dulu panjang skalanya. Rentang itu diturunkan dari ambang, jadi label tidak
   bisa meleset ketika ambangnya diubah. Jendela pembandingnya 14 hari terakhir vs 14 hari
