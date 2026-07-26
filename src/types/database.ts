@@ -35,6 +35,9 @@ export type Medication = {
   nama_obat: string;
   dosis: string | null;
   jadwal: string | null;
+  /** Berapa kali diminum per hari (1–6). Lihat supabase/obat_frekuensi_dan_riwayat.sql. */
+  frekuensi: number;
+  /** Keadaan sekarang saja; riwayatnya ada di `medication_events`. */
   aktif: boolean;
   created_at: string;
 };
@@ -44,8 +47,27 @@ export type MedLog = {
   patient_id: string;
   medication_id: string | null;
   tanggal: string;
+  /** Dosis ke berapa pada hari itu (1–6). */
+  dosis_ke: number;
   diminum: boolean | null;
   alasan: string | null;
+  created_at: string;
+};
+
+export type MedicationEventJenis = 'mulai' | 'stop' | 'lanjut';
+
+/**
+ * Riwayat mulai/berhenti/lanjut obat. BELUM ada di
+ * teman-lupus-supabase-schema.sql — lihat
+ * supabase/obat_frekuensi_dan_riwayat.sql.
+ */
+export type MedicationEvent = {
+  id: string;
+  patient_id: string;
+  medication_id: string;
+  jenis: MedicationEventJenis;
+  tanggal: string;
+  catatan: string | null;
   created_at: string;
 };
 
@@ -175,6 +197,7 @@ export type Database = {
       alerts: Row<Alert>;
       lab_results: Row<LabResult>;
       visit_questions: Row<VisitQuestion>;
+      medication_events: Row<MedicationEvent>;
     };
     Views: { [_ in never]: never };
     Functions: { [_ in never]: never };

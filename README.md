@@ -38,6 +38,19 @@ REST: tabel terbaca (HTTP 200) dan RLS aktif — insert tanpa login ditolak
 layar ringkasan menampilkan pesan yang menyebut nama file SQL-nya, sementara
 enam bagian ringkasan lain tetap jalan.
 
+Skema obat diperbarui 27 Juli 2026 lewat Dashboard SQL Editor dengan isi
+`supabase/obat_frekuensi_dan_riwayat.sql`: kolom `medications.frekuensi`,
+`med_logs.dosis_ke`, unique index `(patient_id, medication_id, tanggal,
+dosis_ke)`, dan tabel `medication_events`. Diverifikasi lewat REST: ketiganya
+terbaca (HTTP 200) dan RLS `medication_events` aktif (insert tanpa login
+ditolak `42501`).
+
+Pemasangan unique index-nya **gagal pada percobaan pertama**: ada 3 pasang baris
+`med_logs` kembar — nilainya identik, dibuat selisih milidetik oleh kode lama
+yang memeriksa-lalu-menyisipkan, sehingga dua ketukan cepat lolos pemeriksaan.
+Persis masalah yang hendak dicegah index ini. Baris yang lebih tua dari tiap
+pasangan dihapus (21 → 18 baris) atas persetujuan, lalu skrip dijalankan ulang.
+
 Aplikasi ini menyimpan check-in dengan upsert (`onConflict: patient_id,tanggal`)
 sehingga mengisi ulang di hari yang sama **memperbarui** baris, bukan menambah
 baris baru. Kalau suatu saat constraint ini hilang, penyimpanan check-in akan
@@ -52,6 +65,7 @@ Bila suatu saat perlu menyiapkan project Supabase dari nol:
    - `supabase/consent_columns.sql`
    - `supabase/unique_checkin_per_hari.sql`
    - `supabase/visit_questions.sql`
+   - `supabase/obat_frekuensi_dan_riwayat.sql`
 3. Salin Project URL & anon key ke `.env`.
 
 ---
@@ -66,7 +80,7 @@ npm start                 # lalu tekan i (iOS) / a (Android), atau pindai QR den
 
 | Perintah            | Fungsi                                         |
 | ------------------- | ---------------------------------------------- |
-| `npm test`          | Unit test (red-flag, ringkasan, MARS-5, UV, beranda, tanggal) — 169 test |
+| `npm test`          | Unit test (red-flag, ringkasan, MARS-5, UV, beranda, tanggal) — 173 test |
 | `npm run typecheck` | Cek tipe TypeScript                            |
 | `npm run lint`      | ESLint + Prettier                              |
 | `npm run format`    | Rapikan format kode                            |
@@ -173,6 +187,26 @@ aplikasi:
   meluber keluar kolomnya.
 - Hitungan di ringkasan memakai `≥`, jadi baris lama bernilai 4 tetap terhitung
   sebagai kelelahan berat.
+
+### Obat: frekuensi dosis & riwayat berhenti
+
+Tiap obat punya **frekuensi** (1–4x sehari). Obat 3x sehari menampilkan tiga
+baris tanda pada layar Obat, dan tiap dosis dicatat sebagai baris `med_logs`
+tersendiri (`dosis_ke`) — sebelumnya satu obat hanya bisa ditandai sekali per
+hari, sehingga pasien yang minum 3x sehari tidak punya cara mencatat dosis yang
+terlewat.
+
+Menghentikan obat **tidak menghapus apa pun**: barisnya ditandai tidak aktif,
+pindah ke daftar "Obat yang pernah diminum" beserta tanggal berhentinya, dan
+bisa dilanjutkan lagi kapan saja. Riwayatnya disimpan sebagai event bertanggal
+di `medication_events` (`mulai` / `stop` / `lanjut`) — bukan sekadar kolom
+tanggal di `medications`, supaya obat yang berkali-kali dihentikan dan
+dilanjutkan tetap terekam utuh.
+
+Bagian 4 ringkasan pra-kunjungan menampilkan riwayat itu sebagai "Perubahan
+obat", dan tetap melaporkan obat yang **sudah dihentikan** selama masih ada
+jejaknya pada periode itu — obat yang distop kemarin justru yang penting dibawa
+ke kontrol.
 
 ### Grafik di layar Tren
 
@@ -373,6 +407,7 @@ aplikasi ini:
 | `consent_columns.sql`         | `profiles.consent_at` & `profiles.consent_version`               |
 | `unique_checkin_per_hari.sql` | Unique `(patient_id, tanggal)` agar upsert check-in bekerja      |
 | `visit_questions.sql`         | Pertanyaan pasien untuk kunjungan (bagian 6 ringkasan)          |
+| `obat_frekuensi_dan_riwayat.sql` | Frekuensi dosis, dosis ke-berapa, & riwayat berhenti/lanjut  |
 
 Semuanya aman dijalankan ulang. `unique_checkin_per_hari.sql` berisi query untuk
 memeriksa duplikat lebih dulu — baca komentarnya sebelum menjalankan.

@@ -27,6 +27,7 @@ import type {
   MarsAssessment,
   MedLog,
   Medication,
+  MedicationEvent,
 } from '@/types/database';
 
 // ---------- Masukan & keluaran ----------
@@ -37,8 +38,11 @@ export interface RingkasanInput {
   sampai: string;
   pasien: { inisial: string; id: string };
   checkins: DailyCheckin[];
+  /** Semua obat, termasuk yang sudah dihentikan. */
   meds: Medication[];
   medLogs: MedLog[];
+  /** Riwayat mulai/stop/lanjut obat. */
+  medEvents: MedicationEvent[];
   mars: MarsAssessment[];
   flares: FlareCheck[];
   labs: LabResult[];
@@ -77,10 +81,14 @@ export interface GejalaRingkas {
 
 export interface ObatTerlewat {
   nama: string;
-  /** Hari yang ditandai "belum diminum". */
+  /** Berapa kali diminum per hari. */
+  frekuensi: number;
+  /** Dosis yang ditandai "belum diminum". */
   terlewat: number;
-  /** Hari yang ditandai "sudah diminum". */
+  /** Dosis yang ditandai "sudah diminum". */
   diminum: number;
+  /** False bila obat sudah dihentikan. */
+  aktif: boolean;
 }
 
 export interface EventRedFlag {
@@ -115,6 +123,8 @@ export interface Ringkasan {
     mars: { tanggal: string; total: number; kategori: string } | null;
     /** Alasan bebas yang ditulis pasien di catatan minum obat. */
     alasan: { tanggal: string; teks: string }[];
+    /** Obat yang mulai, dihentikan, atau dilanjutkan pada periode ini. */
+    riwayat: { tanggal: string; teks: string }[];
   };
   redflag: EventRedFlag[];
   pertanyaan: {
@@ -566,9 +576,16 @@ function perubahanTerkini(rows: DailyCheckin[], dari: string, sampai: string): s
 
 // ---------- 4. Obat ----------
 
+const KATA_EVENT: Record<MedicationEvent['jenis'], string> = {
+  mulai: 'Mulai',
+  stop: 'Berhenti',
+  lanjut: 'Dilanjutkan lagi',
+};
+
 function ringkasObat(
   meds: Medication[],
   logs: MedLog[],
+  events: MedicationEvent[],
   mars: MarsAssessment[],
   dari: string,
   sampai: string
@@ -576,14 +593,36 @@ function ringkasObat(
   const dalamPeriode = logs.filter((l) => l.tanggal >= dari && l.tanggal <= sampai);
   const namaObat = new Map(meds.map((m) => [m.id, m.nama_obat]));
 
-  const daftar: ObatTerlewat[] = meds.map((m) => {
-    const milik = dalamPeriode.filter((l) => l.medication_id === m.id);
-    return {
-      nama: m.nama_obat,
-      terlewat: milik.filter((l) => l.diminum === false).length,
-      diminum: milik.filter((l) => l.diminum === true).length,
-    };
-  });
+  const eventPeriode = events
+    .filter((e) => e.tanggal >= dari && e.tanggal <= sampai)
+    .sort((a, b) => a.tanggal.localeCompare(b.tanggal));
+
+  const riwayat = eventPeriode.map((e) => ({
+    tanggal: e.tanggal,
+    teks: `${KATA_EVENT[e.jenis]} ${namaObat.get(e.medication_id) ?? 'obat'}${
+      e.catatan ? ` — ${e.catatan.trim()}` : ''
+    }`,
+  }));
+
+  // Obat yang dihentikan tetap dilaporkan bila masih ada jejaknya pada periode
+  // ini: kalau tidak, obat yang baru distop kemarin akan hilang dari ringkasan
+  // yang justru dibawa ke kontrol.
+  const adaJejak = (id: string) =>
+    dalamPeriode.some((l) => l.medication_id === id) ||
+    eventPeriode.some((e) => e.medication_id === id);
+
+  const daftar: ObatTerlewat[] = meds
+    .filter((m) => m.aktif || adaJejak(m.id))
+    .map((m) => {
+      const milik = dalamPeriode.filter((l) => l.medication_id === m.id);
+      return {
+        nama: m.nama_obat,
+        frekuensi: m.frekuensi ?? 1,
+        aktif: m.aktif,
+        terlewat: milik.filter((l) => l.diminum === false).length,
+        diminum: milik.filter((l) => l.diminum === true).length,
+      };
+    });
 
   const hariTercatat = new Set(dalamPeriode.map((l) => l.tanggal)).size;
   const totalHari = selisihHari(dari, sampai) + 1;
@@ -602,7 +641,7 @@ function ringkasObat(
 
   return {
     daftar: daftar.sort((a, b) => b.terlewat - a.terlewat || a.nama.localeCompare(b.nama)),
-    hariTanpaCatatan: meds.length === 0 ? 0 : Math.max(0, totalHari - hariTercatat),
+    hariTanpaCatatan: daftar.length === 0 ? 0 : Math.max(0, totalHari - hariTercatat),
     mars:
       marsTerakhir && marsTerakhir.total != null
         ? {
@@ -612,6 +651,7 @@ function ringkasObat(
           }
         : null,
     alasan,
+    riwayat,
   };
 }
 
@@ -690,7 +730,7 @@ export function buatRingkasan(input: RingkasanInput): Ringkasan {
     skor: trenSkor(rows, dari, sampai),
     gejala,
     perubahan: perubahanTerkini(rows, dari, sampai),
-    obat: ringkasObat(input.meds, input.medLogs, input.mars, dari, sampai),
+    obat: ringkasObat(input.meds, input.medLogs, input.medEvents, input.mars, dari, sampai),
     redflag,
     pertanyaan: {
       pasien: input.pertanyaan.map((p) => p.trim()).filter(Boolean),
@@ -759,9 +799,17 @@ export function ringkasanTeks(r: Ringkasan): string {
     b.push('   - Belum ada obat terdaftar di aplikasi.');
   } else {
     for (const o of r.obat.daftar) {
-      b.push(`   - ${o.nama}: ${o.terlewat} hari ditandai belum diminum, ${o.diminum} hari sudah`);
+      const keterangan = [`${o.frekuensi}x sehari`, o.aktif ? null : 'sudah dihentikan']
+        .filter(Boolean)
+        .join(', ');
+      b.push(
+        `   - ${o.nama} (${keterangan}): ${o.terlewat} dosis ditandai belum diminum, ${o.diminum} dosis sudah`
+      );
     }
     b.push(`   - Hari tanpa catatan minum obat sama sekali: ${r.obat.hariTanpaCatatan}`);
+  }
+  for (const h of r.obat.riwayat) {
+    b.push(`   - ${tanggalPendek(h.tanggal)}: ${h.teks}`);
   }
   if (r.obat.mars) {
     b.push(

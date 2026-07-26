@@ -36,6 +36,7 @@ import type {
   MarsAssessment,
   MedLog,
   Medication,
+  MedicationEvent,
   VisitQuestion,
 } from '@/types/database';
 
@@ -64,6 +65,7 @@ interface DataMentah {
   checkins: DailyCheckin[];
   meds: Medication[];
   medLogs: MedLog[];
+  medEvents: MedicationEvent[];
   mars: MarsAssessment[];
   flares: FlareCheck[];
   labs: LabResult[];
@@ -153,16 +155,24 @@ export default function RingkasanScreen() {
     const sampai = todayISO();
     const dari = mundurHari(sampai, hari - 1);
 
-    const [c, me, ml, ma, f, lab] = await Promise.all([
+    const [c, me, ml, mev, ma, f, lab] = await Promise.all([
       supabase
         .from('daily_checkins')
         .select('*')
         .eq('patient_id', patientId)
         .gte('tanggal', dari)
         .lte('tanggal', sampai),
-      supabase.from('medications').select('*').eq('patient_id', patientId).eq('aktif', true),
+      // Termasuk obat yang sudah dihentikan: obat yang distop di tengah
+      // periode justru penting dibawa ke kontrol.
+      supabase.from('medications').select('*').eq('patient_id', patientId),
       supabase
         .from('med_logs')
+        .select('*')
+        .eq('patient_id', patientId)
+        .gte('tanggal', dari)
+        .lte('tanggal', sampai),
+      supabase
+        .from('medication_events')
         .select('*')
         .eq('patient_id', patientId)
         .gte('tanggal', dari)
@@ -180,6 +190,8 @@ export default function RingkasanScreen() {
       supabase.from('lab_results').select('*').eq('patient_id', patientId).limit(100),
     ]);
 
+    // medication_events belum tentu ada di project Supabase lama; kegagalannya
+    // hanya membuat riwayat obat kosong, bukan menghapus bagian lain.
     const pesan = [c.error, me.error, ml.error, ma.error, f.error].find(Boolean)?.message;
     setErr(pesan ?? null);
 
@@ -189,6 +201,7 @@ export default function RingkasanScreen() {
       checkins: (c.data ?? []) as DailyCheckin[],
       meds: (me.data ?? []) as Medication[],
       medLogs: (ml.data ?? []) as MedLog[],
+      medEvents: (mev.data ?? []) as MedicationEvent[],
       mars: (ma.data ?? []) as MarsAssessment[],
       flares: (f.data ?? []) as FlareCheck[],
       labs: (lab.data ?? []) as LabResult[],
@@ -344,8 +357,12 @@ export default function RingkasanScreen() {
           <>
             {r.obat.daftar.map((o) => (
               <Text key={o.nama} style={styles.item}>
-                • {o.nama}: <Text style={styles.tebal}>{o.terlewat}</Text> hari belum diminum,{' '}
-                {o.diminum} hari sudah
+                • {o.nama}{' '}
+                <Text style={styles.lembut}>
+                  ({o.frekuensi}x sehari{o.aktif ? '' : ', sudah dihentikan'})
+                </Text>
+                : <Text style={styles.tebal}>{o.terlewat}</Text> dosis belum diminum, {o.diminum}{' '}
+                dosis sudah
               </Text>
             ))}
             <Text style={styles.lembut}>
@@ -364,6 +381,16 @@ export default function RingkasanScreen() {
             • {tanggalPendek(a.tanggal)}: {a.teks}
           </Text>
         ))}
+        {r.obat.riwayat.length > 0 && (
+          <View style={styles.grup}>
+            <Text style={styles.grupJudul}>Perubahan obat</Text>
+            {r.obat.riwayat.map((h) => (
+              <Text key={`${h.tanggal}|${h.teks}`} style={styles.item}>
+                • {tanggalPendek(h.tanggal)}: {h.teks}
+              </Text>
+            ))}
+          </View>
+        )}
         <Text style={styles.catatanKecil}>
           Efek samping belum dikumpulkan secara terstruktur oleh aplikasi.
         </Text>

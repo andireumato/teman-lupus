@@ -5,6 +5,7 @@ import type {
   MarsAssessment,
   MedLog,
   Medication,
+  MedicationEvent,
 } from '@/types/database';
 
 import {
@@ -39,15 +40,34 @@ function gejala(system: string, item: string) {
   return { system, item, present: true };
 }
 
-function med(nama: string, medId = id()): Medication {
+function med(nama: string, medId = id(), p: Partial<Medication> = {}): Medication {
   return {
     id: medId,
     patient_id: 'p1',
     nama_obat: nama,
     dosis: null,
     jadwal: null,
+    frekuensi: 1,
     aktif: true,
     created_at: '2026-01-01T00:00:00+07:00',
+    ...p,
+  };
+}
+
+function medEvent(
+  medicationId: string,
+  jenis: MedicationEvent['jenis'],
+  tanggal: string,
+  catatan: string | null = null
+): MedicationEvent {
+  return {
+    id: id(),
+    patient_id: 'p1',
+    medication_id: medicationId,
+    jenis,
+    tanggal,
+    catatan,
+    created_at: `${tanggal}T08:00:00+07:00`,
   };
 }
 
@@ -56,6 +76,7 @@ function medLog(p: Partial<MedLog> & { tanggal: string }): MedLog {
     id: id(),
     patient_id: 'p1',
     medication_id: null,
+    dosis_ke: 1,
     diminum: null,
     alasan: null,
     created_at: `${p.tanggal}T08:00:00+07:00`,
@@ -83,6 +104,7 @@ function input(p: Partial<RingkasanInput> = {}): RingkasanInput {
     checkins: [],
     meds: [],
     medLogs: [],
+    medEvents: [],
     mars: [],
     flares: [],
     labs: [],
@@ -518,7 +540,9 @@ describe('kepatuhan obat', () => {
         ],
       })
     );
-    expect(r.obat.daftar).toEqual([{ nama: 'Hidroksiklorokuin', terlewat: 2, diminum: 1 }]);
+    expect(r.obat.daftar).toEqual([
+      { nama: 'Hidroksiklorokuin', frekuensi: 1, aktif: true, terlewat: 2, diminum: 1 },
+    ]);
     expect(r.obat.hariTanpaCatatan).toBe(27);
   });
 
@@ -526,6 +550,66 @@ describe('kepatuhan obat', () => {
     const r = buatRingkasan(input());
     expect(r.obat.daftar).toEqual([]);
     expect(r.obat.hariTanpaCatatan).toBe(0);
+  });
+
+  it('menghitung per dosis, bukan per hari', () => {
+    // Obat 3x sehari: satu hari bisa punya tiga catatan.
+    const m = med('Metilprednisolon', 'm3', { frekuensi: 3 });
+    const r = buatRingkasan(
+      input({
+        meds: [m],
+        medLogs: [
+          medLog({ tanggal: '2026-07-10', medication_id: 'm3', dosis_ke: 1, diminum: true }),
+          medLog({ tanggal: '2026-07-10', medication_id: 'm3', dosis_ke: 2, diminum: true }),
+          medLog({ tanggal: '2026-07-10', medication_id: 'm3', dosis_ke: 3, diminum: false }),
+        ],
+      })
+    );
+    expect(r.obat.daftar[0]).toEqual({
+      nama: 'Metilprednisolon',
+      frekuensi: 3,
+      aktif: true,
+      terlewat: 1,
+      diminum: 2,
+    });
+  });
+
+  it('mencatat tanggal berhenti & lanjut obat', () => {
+    const r = buatRingkasan(
+      input({
+        meds: [med('Prednison', 'm4')],
+        medEvents: [
+          medEvent('m4', 'stop', '2026-07-12', 'perut perih'),
+          medEvent('m4', 'lanjut', '2026-07-20'),
+        ],
+      })
+    );
+    expect(r.obat.riwayat).toEqual([
+      { tanggal: '2026-07-12', teks: 'Berhenti Prednison — perut perih' },
+      { tanggal: '2026-07-20', teks: 'Dilanjutkan lagi Prednison' },
+    ]);
+  });
+
+  it('obat yang dihentikan tetap dilaporkan bila ada jejaknya di periode ini', () => {
+    const r = buatRingkasan(
+      input({
+        meds: [med('Prednison', 'm5', { aktif: false })],
+        medEvents: [medEvent('m5', 'stop', '2026-07-12')],
+      })
+    );
+    expect(r.obat.daftar).toHaveLength(1);
+    expect(r.obat.daftar[0].aktif).toBe(false);
+  });
+
+  it('obat lama tanpa jejak di periode ini tidak ikut dilaporkan', () => {
+    const r = buatRingkasan(
+      input({
+        meds: [med('Obat lama', 'm6', { aktif: false })],
+        medEvents: [medEvent('m6', 'stop', '2026-05-01')],
+      })
+    );
+    expect(r.obat.daftar).toEqual([]);
+    expect(r.obat.riwayat).toEqual([]);
   });
 
   it('mengambil MARS-5 terbaru di dalam periode saja', () => {
