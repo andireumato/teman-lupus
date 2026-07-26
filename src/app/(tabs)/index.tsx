@@ -1,7 +1,10 @@
-import { useCallback, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { DailyHeader, StatusBeranda, TipCard } from '@/components/beranda-cards';
+import { CheckinSukses } from '@/components/checkin-sukses';
+import { MoodScale } from '@/components/mood-scale';
 import {
   Card,
   Chip,
@@ -18,8 +21,9 @@ import {
 } from '@/components/ui/kit';
 import { Brand, space } from '@/constants/brand';
 import { DISCLAIMER } from '@/constants/consent';
-import { SISTEM_GEJALA, SKALA_LELAH, SKALA_MOOD, SKALA_NYERI_SENDI } from '@/constants/lupus';
-import { hitungStreak, tanggalPanjang, todayISO } from '@/lib/dates';
+import { SISTEM_GEJALA, SKALA_LELAH, SKALA_NYERI_SENDI } from '@/constants/lupus';
+import { insightText, type CheckinRingkas, type Insight } from '@/lib/beranda';
+import { hitungStreak, todayISO } from '@/lib/dates';
 import { useSession } from '@/lib/session';
 import { supabase } from '@/lib/supabase';
 import type { DailyCheckin, SymptomEntry } from '@/types/database';
@@ -34,6 +38,7 @@ export default function CheckinScreen() {
   const [loading, setLoading] = useState(true);
   const [sudahIsi, setSudahIsi] = useState(false);
   const [streak, setStreak] = useState(0);
+  const [insight, setInsight] = useState<Insight | null>(null);
   const [mood, setMood] = useState<number | null>(null);
   const [lelah, setLelah] = useState<number | null>(null);
   const [nyeri, setNyeri] = useState<number | null>(null);
@@ -41,7 +46,8 @@ export default function CheckinScreen() {
   const [catatan, setCatatan] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [ok, setOk] = useState<string | null>(null);
+  // Layar apresiasi ditampilkan tepat setelah menyimpan, lalu ditutup manual.
+  const [sukses, setSukses] = useState(false);
 
   const muat = useCallback(async () => {
     if (!patientId) {
@@ -71,6 +77,7 @@ export default function CheckinScreen() {
         hariIni
       )
     );
+    setInsight(insightText(rows as CheckinRingkas[]));
 
     const today = rows.find((r) => r.tanggal === hariIni);
     if (today) {
@@ -106,14 +113,13 @@ export default function CheckinScreen() {
 
   async function simpan() {
     setErr(null);
-    setOk(null);
 
     if (!patientId) {
-      setErr('Data pasien belum siap. Tarik untuk memuat ulang atau masuk kembali.');
+      setErr('Data pasien belum siap. Buka ulang tab ini atau masuk kembali.');
       return;
     }
     if (mood == null || lelah == null || nyeri == null) {
-      setErr('Mohon isi mood, kelelahan, dan nyeri sendi.');
+      setErr('Mohon isi perasaan, kelelahan, dan nyeri sendi.');
       return;
     }
 
@@ -147,14 +153,29 @@ export default function CheckinScreen() {
       setErr(`Gagal menyimpan: ${error.message}`);
       return;
     }
-    setOk('Check-in tersimpan. Terima kasih.');
     await muat();
+    setSukses(true);
   }
 
   if (loading) return <Loading />;
 
+  const sekarang = new Date();
+
+  if (sukses) {
+    return (
+      <Screen>
+        <CheckinSukses streak={streak} insight={insight} onKembali={() => setSukses(false)} />
+        <Disclaimer>{DISCLAIMER}</Disclaimer>
+      </Screen>
+    );
+  }
+
   return (
     <Screen>
+      <DailyHeader hariIni={hariIni} sekarang={sekarang} />
+      <StatusBeranda streak={streak} insight={insight} sudahIsi={sudahIsi} />
+      <TipCard sekarang={sekarang} />
+
       <InfoBar>
         Catat kondisimu setiap hari (mood, kelelahan, nyeri, gejala) agar perkembanganmu bisa
         dipantau bersama dokter.
@@ -162,26 +183,11 @@ export default function CheckinScreen() {
 
       <Card>
         <Text style={styles.sapaan}>Halo, {profile?.nama ?? 'Sahabat'}</Text>
-        <Text style={styles.tanggal}>{tanggalPanjang(hariIni)}</Text>
-        <View style={styles.statRow}>
-          <View style={styles.stat}>
-            <Text style={styles.statAngka}>{streak}</Text>
-            <Text style={styles.statLabel}>hari berturut</Text>
-          </View>
-          <View style={styles.stat}>
-            <Text style={[styles.statAngka, { color: sudahIsi ? Brand.hijau : Brand.kuning }]}>
-              {sudahIsi ? '✓' : '—'}
-            </Text>
-            <Text style={styles.statLabel}>{sudahIsi ? 'sudah diisi' : 'belum diisi'}</Text>
-          </View>
-        </View>
-      </Card>
 
-      <Card>
-        <SectionLabel>Bagaimana perasaanmu hari ini?</SectionLabel>
-        <Segmented options={SKALA_MOOD} value={mood} onChange={setMood} />
+        <SectionLabel>Perasaan hari ini</SectionLabel>
+        <MoodScale value={mood} onChange={setMood} />
 
-        <SectionLabel>Seberapa lelah?</SectionLabel>
+        <SectionLabel>Kelelahan</SectionLabel>
         <Segmented options={SKALA_LELAH} value={lelah} onChange={setLelah} />
 
         <SectionLabel>Nyeri sendi</SectionLabel>
@@ -219,7 +225,6 @@ export default function CheckinScreen() {
           style={styles.catatan}
         />
         {err && <Msg tone="err">{err}</Msg>}
-        {ok && <Msg tone="ok">{ok}</Msg>}
         <PrimaryButton
           label={sudahIsi ? 'Perbarui check-in' : 'Simpan check-in'}
           onPress={simpan}
@@ -233,18 +238,7 @@ export default function CheckinScreen() {
 }
 
 const styles = StyleSheet.create({
-  sapaan: { fontSize: 17, fontWeight: '700', color: Brand.teks },
-  tanggal: { fontSize: 13, color: Brand.teksLembut },
-  statRow: { flexDirection: 'row', gap: space.md, marginTop: space.sm },
-  stat: {
-    flex: 1,
-    backgroundColor: Brand.unguMuda,
-    borderRadius: 12,
-    paddingVertical: space.md,
-    alignItems: 'center',
-  },
-  statAngka: { fontSize: 24, fontWeight: '800', color: Brand.ungu },
-  statLabel: { fontSize: 11.5, color: Brand.teksLembut },
+  sapaan: { fontSize: 16, fontWeight: '700', color: Brand.teks },
   hint: { fontSize: 12, color: Brand.teksLembut },
   sistem: { gap: 6, marginTop: space.sm },
   sistemLabel: { fontSize: 12.5, fontWeight: '700', color: '#4b5563' },

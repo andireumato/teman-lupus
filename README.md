@@ -68,17 +68,41 @@ src/
       tren.tsx            Grafik, riwayat, akun
   lib/
     redflag.ts            red-flag engine [DETERMINISTIK]
+    beranda.ts            salam, konten harian, tingkatan streak, insight
     mars.ts               skoring MARS-5
     dates.ts              tanggal lokal & streak
     session.tsx           auth + profil + consent
     supabase.ts           klien Supabase
   constants/
     lupus.ts              gejala per sistem organ, panel lab & nilai rujukan
+    edukasi.ts            kutipan harian + tips lupus
     consent.ts            naskah informed consent + versinya
     brand.ts              palet warna
   types/database.ts       bentuk tabel Supabase
 supabase/                 SQL pelengkap yang belum ada di skema awal
 ```
+
+---
+
+## Beranda
+
+Mengikuti prototipe web terbaru (`docs/prototipe-web-2026-07-26.html`):
+
+- **Sapaan harian** sesuai waktu + tanggal Indonesia + kutipan penyemangat
+- **Kartu streak** dengan tingkatan pada 3 / 7 / 14 / 30 / 60 / 100 hari,
+  plus berapa hari lagi menuju tingkatan berikutnya
+- **Insight personal** dari riwayat check-in
+- **"Tahukah kamu?"** — edukasi lupus harian
+- **Layar apresiasi** setelah check-in tersimpan
+
+Kutipan dan tips berputar berdasarkan hari-ke-berapa dalam setahun, jadi semua
+pasien melihat konten yang sama pada hari yang sama.
+
+> **Insight bukan penilaian klinis.** Ia hanya merefleksikan apa yang pasien
+> catat sendiri, dan tidak pernah menyebut flare, diagnosis, atau perubahan
+> dosis. Satu-satunya jalur eskalasi tetap red-flag engine di bawah ini.
+> Bila insight mendeteksi nyeri menaik, ia mengarahkan pasien ke **Cek Flare** —
+> bukan mengambil kesimpulan sendiri.
 
 ---
 
