@@ -32,6 +32,12 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Teman Lupus memakai lokasimu hanya untuk menampilkan indeks UV harian di daerahmu. Lokasi tidak dikirim ke server dan tidak disimpan bersama data medismu."
+        }
       ]
     ],
     "experiments": {

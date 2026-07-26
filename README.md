@@ -10,16 +10,28 @@ Expo SDK 57 · React Native 0.86 · TypeScript · Supabase.
 
 ---
 
-## ⚠️ Backend perlu disiapkan lebih dulu
+## Status backend
 
-`.env` saat ini menunjuk ke `zuaskccuznkljafznofq.supabase.co` — project yang
-dipakai prototipe web. **Host itu sudah tidak ada lagi** (DNS NXDOMAIN), jadi
-login akan gagal dengan _"fetch failed: A server with the specified hostname
-could not be found."_
+`.env` menunjuk ke project Supabase yang sama dengan prototipe web
+(`zuaskccuznkljafznofq`). Project ini sempat *paused* dan sudah di-resume;
+REST & auth berjalan normal.
 
-Untuk menjalankannya:
+Isi database sudah lebih maju daripada `teman-lupus-supabase-schema.sql` —
+tabel `lab_results` dan kolom `profiles.consent_at` / `consent_version` **sudah
+ada** di sana. SQL di `supabase/` tetap disimpan sebagai dokumentasi dan aman
+dijalankan ulang bila suatu saat perlu menyiapkan project baru.
 
-1. Buat project Supabase baru.
+> **Satu hal belum terverifikasi:** unique constraint `(patient_id, tanggal)`
+> pada `daily_checkins`. Aplikasi menyimpan check-in dengan upsert
+> (`onConflict: patient_id,tanggal`); tanpa constraint itu, penyimpanan akan
+> gagal. Constraint tidak terlihat lewat REST API — perlu akses SQL
+> (`supabase login` → `supabase link`) untuk memeriksanya. Bila belum ada,
+> jalankan `supabase/unique_checkin_per_hari.sql` (baca komentarnya dulu:
+> ada query untuk mendeteksi duplikat sebelum constraint dipasang).
+
+Bila suatu saat perlu menyiapkan project Supabase dari nol:
+
+1. Buat project baru.
 2. SQL Editor → jalankan berurutan:
    - `teman-lupus-supabase-schema.sql` (skema utama, 10 tabel + RLS)
    - `supabase/lab_results.sql`
@@ -39,7 +51,7 @@ npm start                 # lalu tekan i (iOS) / a (Android), atau pindai QR den
 
 | Perintah            | Fungsi                                         |
 | ------------------- | ---------------------------------------------- |
-| `npm test`          | Unit test (red-flag, MARS-5, tanggal) — 45 test |
+| `npm test`          | Unit test (red-flag, MARS-5, UV, beranda, tanggal) — 98 test |
 | `npm run typecheck` | Cek tipe TypeScript                            |
 | `npm run lint`      | ESLint + Prettier                              |
 | `npm run format`    | Rapikan format kode                            |
@@ -59,9 +71,10 @@ src/
     _layout.tsx           penjaga rute: login → consent → tabs
     login.tsx             masuk / daftar (pasien atau dokter)
     consent.tsx           informed consent, wajib sebelum masuk
+    checkin.tsx           formulir check-in harian + layar apresiasi
     mars.tsx              kuesioner MARS-5
     (tabs)/
-      index.tsx           Check-in harian
+      index.tsx           Beranda
       flare.tsx           Cek Flare (triase tanda bahaya)
       obat.tsx            Obat & kepatuhan
       lab.tsx             Hasil laboratorium
@@ -69,6 +82,7 @@ src/
   lib/
     redflag.ts            red-flag engine [DETERMINISTIK]
     beranda.ts            salam, konten harian, tingkatan streak, insight
+    uv.ts                 kategori indeks UV + pengambilan Open-Meteo
     mars.ts               skoring MARS-5
     dates.ts              tanggal lokal & streak
     session.tsx           auth + profil + consent
@@ -86,17 +100,44 @@ supabase/                 SQL pelengkap yang belum ada di skema awal
 
 ## Beranda
 
-Mengikuti prototipe web terbaru (`docs/prototipe-web-2026-07-26.html`):
+Mengikuti `docs/prototipe-web-2026-07-16.html`:
 
-- **Sapaan harian** sesuai waktu + tanggal Indonesia + kutipan penyemangat
-- **Kartu streak** dengan tingkatan pada 3 / 7 / 14 / 30 / 60 / 100 hari,
-  plus berapa hari lagi menuju tingkatan berikutnya
-- **Insight personal** dari riwayat check-in
+- **Hero bergradien** — sapaan sesuai waktu + nama depan, tanggal, kutipan harian
+- **Kartu indeks UV** — UV maksimum hari ini dari Open-Meteo + saran proteksi
+- **Kartu ajakan** — mengarah ke formulir check-in, atau apresiasi bila hari ini
+  sudah terisi; streak tampil sebagai chip kecil di sudut
+- **Akses cepat** — pintasan ke Cek Flare / Obat / Tren
 - **"Tahukah kamu?"** — edukasi lupus harian
-- **Layar apresiasi** setelah check-in tersimpan
+
+Formulir check-in ada di layar terpisah (`/checkin`), diakhiri **layar
+apresiasi** berisi streak, pencapaian tingkatan (3/7/14/30/60/100 hari), dan
+insight personal.
 
 Kutipan dan tips berputar berdasarkan hari-ke-berapa dalam setahun, jadi semua
 pasien melihat konten yang sama pada hari yang sama.
+
+### Catatan dua prototipe
+
+`docs/` menyimpan dua snapshot web. Yang **16 Juli** adalah acuan tampilan yang
+dipakai sekarang. Yang **26 Juli** lebih baru secara tanggal dan sempat menjadi
+acuan, tetapi Beranda-nya dikembalikan ke bentuk 16 Juli atas permintaan.
+Bila suatu saat ingin menengok arah yang satunya: bedanya ada pada Beranda —
+versi 26 Juli tidak punya kartu UV dan akses cepat, formulir check-in menyatu di
+Beranda, dan streak tampil sebagai kartu penuh, bukan chip.
+
+### Kartu UV & privasi lokasi
+
+Lokasi hanya dipakai untuk mencari indeks UV, **tidak dikirim ke Supabase** dan
+tidak disimpan bersama data medis — hanya di-cache di perangkat. Bila izin
+ditolak, kartu tetap tampil memakai koordinat Medan dan menandainya sebagai
+perkiraan. Bila jaringan gagal, kartu hilang diam-diam.
+
+Permintaan izin digantung pada `patientId`, supaya pasien tidak dimintai izin
+lokasi sebelum sempat login dan menyetujui consent.
+
+> Di **Expo Go**, teks izin yang muncul adalah milik Expo Go ("shows you the
+> current location on a map"), bukan teks kita. Teks di `app.json` baru dipakai
+> pada development build atau build produksi.
 
 > **Insight bukan penilaian klinis.** Ia hanya merefleksikan apa yang pasien
 > catat sendiri, dan tidak pernah menyebut flare, diagnosis, atau perubahan

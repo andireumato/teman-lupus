@@ -58,6 +58,7 @@ function AuthGate() {
       <Stack.Screen name="login" options={{ headerShown: false }} />
       <Stack.Screen name="consent" options={{ title: 'Persetujuan Ikut Serta' }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="checkin" options={{ title: 'Check-in Harian' }} />
       <Stack.Screen name="mars" options={{ title: 'Kuesioner MARS-5' }} />
     </Stack>
   );
