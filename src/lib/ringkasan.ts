@@ -17,6 +17,7 @@
  *   tindakan.
  */
 
+import { LABEL_EFEK } from '@/constants/efek-samping';
 import { SISTEM_GEJALA } from '@/constants/lupus';
 import { mundurHari, selisihHari, tanggalPendek } from '@/lib/dates';
 import { PERTANYAAN_MENDESAK, PERTANYAAN_TANDA_BAHAYA } from '@/lib/redflag';
@@ -28,6 +29,7 @@ import type {
   MedLog,
   Medication,
   MedicationEvent,
+  MedSideEffect,
 } from '@/types/database';
 
 // ---------- Masukan & keluaran ----------
@@ -43,6 +45,8 @@ export interface RingkasanInput {
   medLogs: MedLog[];
   /** Riwayat mulai/stop/lanjut obat. */
   medEvents: MedicationEvent[];
+  /** Efek samping yang dilaporkan pasien. */
+  efekSamping: MedSideEffect[];
   mars: MarsAssessment[];
   flares: FlareCheck[];
   labs: LabResult[];
@@ -142,6 +146,12 @@ export interface Ringkasan {
       tercatat: number;
       terlewat: { id: string; nama: string; jumlah: number }[];
     };
+    /**
+     * Efek samping yang dilaporkan pasien, digabung per jenis. Terpisah dari
+     * gejala di bagian 2 karena keluhan yang sama bisa datang dari lupusnya
+     * atau dari obatnya — yang membedakan penilaian dokter, bukan aplikasi.
+     */
+    efekSamping: { jenis: string; label: string; jumlah: number; terakhir: string }[];
     /** Hari dalam periode tanpa satu pun catatan minum obat. */
     hariTanpaCatatan: number;
     mars: { tanggal: string; total: number; kategori: string } | null;
@@ -604,10 +614,37 @@ const KATA_EVENT: Record<MedicationEvent['jenis'], string> = {
   lanjut: 'lanjut',
 };
 
+function ringkasEfekSamping(
+  efek: MedSideEffect[],
+  dari: string,
+  sampai: string
+): Ringkasan['obat']['efekSamping'] {
+  const per = new Map<string, { jumlah: number; terakhir: string }>();
+  for (const e of efek) {
+    if (e.tanggal < dari || e.tanggal > sampai) continue;
+    const s = per.get(e.jenis) ?? { jumlah: 0, terakhir: e.tanggal };
+    per.set(e.jenis, {
+      jumlah: s.jumlah + 1,
+      terakhir: e.tanggal > s.terakhir ? e.tanggal : s.terakhir,
+    });
+  }
+  return [...per.entries()]
+    .map(([jenis, s]) => ({
+      jenis,
+      // Kunci yang tidak dikenal tetap ditampilkan apa adanya: daftar efek
+      // samping bisa berubah, dan laporan lama tidak boleh hilang diam-diam.
+      label: LABEL_EFEK.get(jenis) ?? jenis,
+      jumlah: s.jumlah,
+      terakhir: s.terakhir,
+    }))
+    .sort((a, b) => b.jumlah - a.jumlah || a.label.localeCompare(b.label));
+}
+
 function ringkasObat(
   meds: Medication[],
   logs: MedLog[],
   events: MedicationEvent[],
+  efek: MedSideEffect[],
   mars: MarsAssessment[],
   dari: string,
   sampai: string
@@ -685,6 +722,7 @@ function ringkasObat(
         .filter((o) => o.terlewat > 0)
         .map((o) => ({ id: o.id, nama: o.nama, jumlah: o.terlewat })),
     },
+    efekSamping: ringkasEfekSamping(efek, dari, sampai),
     hariTanpaCatatan: daftar.length === 0 ? 0 : Math.max(0, totalHari - hariTercatat),
     mars:
       marsTerakhir && marsTerakhir.total != null
@@ -774,7 +812,15 @@ export function buatRingkasan(input: RingkasanInput): Ringkasan {
     skor: trenSkor(rows, dari, sampai),
     gejala,
     perubahan: perubahanTerkini(rows, dari, sampai),
-    obat: ringkasObat(input.meds, input.medLogs, input.medEvents, input.mars, dari, sampai),
+    obat: ringkasObat(
+      input.meds,
+      input.medLogs,
+      input.medEvents,
+      input.efekSamping,
+      input.mars,
+      dari,
+      sampai
+    ),
     redflag,
     pertanyaan: {
       pasien: input.pertanyaan.map((p) => p.trim()).filter(Boolean),
@@ -872,6 +918,13 @@ export function ringkasanTeks(r: Ringkasan): string {
       ? ` · ${r.obat.hariTanpaCatatan} dari ${r.kepala.jumlahHari} hari tanpa catatan`
       : '';
   b.push(`   - ${mars}${kosong}`);
+  if (r.obat.efekSamping.length > 0) {
+    b.push(
+      `   - Efek samping dilaporkan: ${r.obat.efekSamping
+        .map((e) => `${e.label} ${e.jumlah}× (terakhir ${tanggalPendek(e.terakhir)})`)
+        .join('; ')}`
+    );
+  }
   for (const a of r.obat.alasan) {
     b.push(`   - Alasan: ${tanggalPendek(a.tanggal)} ${a.teks}`);
   }
@@ -908,8 +961,9 @@ export function ringkasanTeks(r: Ringkasan): string {
   b.push('');
 
   b.push(
-    'Ringkasan ini dibuat otomatis dari catatan pasien. Efek samping obat belum dikumpulkan ' +
-      'secara terstruktur. Bukan penilaian aktivitas penyakit dan bukan alat diagnosis.'
+    'Ringkasan ini dibuat otomatis dari catatan pasien. Efek samping adalah yang DILAPORKAN ' +
+      'pasien, belum dipilah dari aktivitas penyakit. Bukan penilaian aktivitas penyakit dan ' +
+      'bukan alat diagnosis.'
   );
 
   return b.join('\n');

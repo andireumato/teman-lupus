@@ -78,6 +78,7 @@ Bila suatu saat perlu menyiapkan project Supabase dari nol:
    - `supabase/visit_questions.sql`
    - `supabase/obat_frekuensi_dan_riwayat.sql`
    - `supabase/sisi_dokter.sql`
+   - `supabase/efek_samping.sql`
 3. Salin Project URL & anon key ke `.env`.
 
 ---
@@ -115,6 +116,7 @@ src/
     checkin.tsx           formulir check-in harian + layar apresiasi
     mars.tsx              kuesioner MARS-5
     ringkasan.tsx         ringkasan pra-kunjungan (Bagian 8 spesifikasi)
+    efek-samping.tsx      laporan efek samping obat oleh pasien
     dokter/               sisi dokter (hanya untuk role 'doctor')
       index.tsx           daftar pasien tertaut
       akun.tsx            kode dokter & keluar
@@ -142,6 +144,7 @@ src/
   constants/
     lupus.ts              gejala per sistem organ, panel lab & nilai rujukan
     sledai.ts             24 deskriptor SLEDAI-2K + bobotnya
+    efek-samping.ts       daftar efek samping obat [DRAF, perlu review]
     edukasi.ts            kutipan harian + tips lupus
     consent.ts            naskah informed consent + versinya
     brand.ts              palet warna
@@ -262,6 +265,30 @@ sama dengan MARS-5.
 Nama obat hanya disebut pada baris "terlewat" bila obat itu memang punya dosis
 terlewat. Keterbatasan efek samping pindah ke kalimat penutup ringkasan: ia
 bercerita tentang aplikasi, bukan tentang pasien.
+
+### Efek samping obat
+
+Pasien melaporkannya lewat **Obat → Laporkan efek samping**: daftar centang
+16 keluhan yang lazim pada obat lupus, boleh disertai obat yang dicurigai
+(opsional — "Tidak tahu" adalah pilihan sah, karena menebak lebih buruk
+daripada mengosongkan) dan catatan bebas.
+
+Disimpan di tabel `med_side_effects`, **bukan** di `daily_checkins.gejala`.
+Alasannya menentukan: beberapa keluhan — ruam, rambut rontok, sariawan, demam —
+bisa datang dari lupusnya atau dari obatnya. Kalau digabung, bagian 2 ringkasan
+("gejala menonjol per sistem organ") akan menghitung efek obat sebagai
+aktivitas penyakit. Yang membedakan keduanya penilaian dokter, bukan tebakan
+aplikasi; jadi aplikasi mencatat keduanya apa adanya, di tempat berbeda.
+
+Dua keluhan ditandai `arahkanCekFlare` — pandangan kabur dan demam — karena
+keduanya juga bisa jadi tanda bahaya. Aplikasi **tidak** mengeskalasi sendiri:
+ia hanya menampilkan pesan yang mengarahkan pasien ke Cek Flare, tetap satu-
+satunya jalur eskalasi.
+
+> ⚠️ **Daftar 16 efek sampingnya masih DRAF** (`constants/efek-samping.ts`),
+> disusun dari efek samping yang lazim pada hidroksiklorokuin, steroid,
+> mikofenolat, azatioprin, dan metotreksat. Menambah, membuang, atau mengubah
+> kata-katanya adalah keputusan reumatolog.
 
 ### Grafik di layar Tren
 
@@ -504,6 +531,7 @@ aplikasi ini:
 | `visit_questions.sql`         | Pertanyaan pasien untuk kunjungan (bagian 6 ringkasan)          |
 | `obat_frekuensi_dan_riwayat.sql` | Frekuensi dosis, dosis ke-berapa, & riwayat berhenti/lanjut  |
 | `sisi_dokter.sql`             | Kode dokter, fungsi penautan, RLS akses profil                  |
+| `efek_samping.sql`            | Tabel efek samping obat yang dilaporkan pasien                   |
 
 Semuanya aman dijalankan ulang. `unique_checkin_per_hari.sql` berisi query untuk
 memeriksa duplikat lebih dulu — baca komentarnya sebelum menjalankan.
@@ -527,8 +555,6 @@ menyetujui ulang. Ini syarat audit etik.
   Tabel `sledai_assessments`, `visits`, dan `alerts` sudah ada di skema tetapi
   belum dipakai. Pengguna dengan peran `doctor` saat ini masuk ke tampilan yang
   sama dengan pasien.
-- **Efek samping obat terstruktur** — sekarang hanya ada alasan bebas di
-  catatan minum obat, sehingga bagian 4 ringkasan pra-kunjungan belum lengkap.
 - **Tindak lanjut sesudah peringatan red-flag** — tidak ada layar yang bertanya
   "apa yang kamu lakukan setelah itu?", jadi bagian 5 ringkasan selalu berkata
   belum tercatat.

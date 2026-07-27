@@ -35,6 +35,7 @@ import type {
   MedLog,
   Medication,
   MedicationEvent,
+  MedSideEffect,
   VisitQuestion,
 } from '@/types/database';
 
@@ -62,6 +63,7 @@ interface DataMentah {
   meds: Medication[];
   medLogs: MedLog[];
   medEvents: MedicationEvent[];
+  efekSamping: MedSideEffect[];
   mars: MarsAssessment[];
   flares: FlareCheck[];
   labs: LabResult[];
@@ -131,7 +133,7 @@ export default function RingkasanScreen() {
     const sampai = todayISO();
     const dari = mundurHari(sampai, hari - 1);
 
-    const [c, me, ml, mev, ma, f, lab] = await Promise.all([
+    const [c, me, ml, mev, ma, f, lab, es] = await Promise.all([
       supabase
         .from('daily_checkins')
         .select('*')
@@ -164,6 +166,12 @@ export default function RingkasanScreen() {
       // lab_results belum tentu ada di project Supabase lama — kegagalannya
       // tidak boleh menghapus enam bagian ringkasan yang lain.
       supabase.from('lab_results').select('*').eq('patient_id', patientId).limit(100),
+      supabase
+        .from('med_side_effects')
+        .select('*')
+        .eq('patient_id', patientId)
+        .gte('tanggal', dari)
+        .lte('tanggal', sampai),
     ]);
 
     // medication_events belum tentu ada di project Supabase lama; kegagalannya
@@ -181,6 +189,7 @@ export default function RingkasanScreen() {
       mars: (ma.data ?? []) as MarsAssessment[],
       flares: (f.data ?? []) as FlareCheck[],
       labs: (lab.data ?? []) as LabResult[],
+      efekSamping: (es.data ?? []) as MedSideEffect[],
     });
     await muatPertanyaan(patientId);
     setLoading(false);

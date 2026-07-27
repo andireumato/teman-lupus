@@ -477,6 +477,15 @@ export default function ObatScreen() {
         </Card>
       )}
 
+      <Link href="/efek-samping" asChild>
+        <Pressable style={styles.efekCard}>
+          <Text style={styles.efekJudul}>Laporkan efek samping</Text>
+          <Text style={styles.efekSub}>
+            Keluhan yang kamu duga berasal dari obat. Dicatat terpisah dari gejala lupus.
+          </Text>
+        </Pressable>
+      </Link>
+
       <Link href="/mars" asChild>
         <Pressable style={styles.marsCard}>
           <Text style={styles.marsJudul}>Kuesioner MARS-5</Text>
@@ -563,6 +572,16 @@ const styles = StyleSheet.create({
     borderBottomColor: '#f3f4f6',
   },
   lamaNama: { fontSize: 14, fontWeight: '600', color: Brand.teks },
+  efekCard: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: Brand.garis,
+    borderRadius: radius.lg,
+    padding: space.lg,
+    gap: 4,
+  },
+  efekJudul: { fontSize: 15, fontWeight: '700', color: Brand.teks },
+  efekSub: { fontSize: 12.5, color: Brand.teksLembut, lineHeight: 18 },
   marsCard: {
     backgroundColor: Brand.unguMuda,
     borderWidth: 1,

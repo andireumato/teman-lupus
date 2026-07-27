@@ -179,6 +179,23 @@ export type VisitQuestion = {
   created_at: string;
 };
 
+/**
+ * Efek samping obat yang dilaporkan pasien. Sengaja terpisah dari
+ * `daily_checkins.gejala` — lihat catatan di supabase/efek_samping.sql.
+ * BELUM ada di teman-lupus-supabase-schema.sql.
+ */
+export type MedSideEffect = {
+  id: string;
+  patient_id: string;
+  /** NULL bila pasien tidak tahu obat mana penyebabnya. */
+  medication_id: string | null;
+  /** Kunci dari constants/efek-samping.ts. */
+  jenis: string;
+  tanggal: string;
+  catatan: string | null;
+  created_at: string;
+};
+
 export type Alert = {
   id: string;
   patient_id: string;
@@ -211,6 +228,7 @@ export type Database = {
       lab_results: Row<LabResult>;
       visit_questions: Row<VisitQuestion>;
       medication_events: Row<MedicationEvent>;
+      med_side_effects: Row<MedSideEffect>;
     };
     Views: { [_ in never]: never };
     Functions: {

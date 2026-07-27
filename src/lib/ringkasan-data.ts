@@ -20,6 +20,7 @@ import type {
   MedLog,
   Medication,
   MedicationEvent,
+  MedSideEffect,
 } from '@/types/database';
 
 export interface DataRingkasan {
@@ -29,6 +30,7 @@ export interface DataRingkasan {
   meds: Medication[];
   medLogs: MedLog[];
   medEvents: MedicationEvent[];
+  efekSamping: MedSideEffect[];
   mars: MarsAssessment[];
   flares: FlareCheck[];
   labs: LabResult[];
@@ -43,7 +45,7 @@ export async function ambilDataRingkasan(
   const sampai = todayISO();
   const dari = mundurHari(sampai, jumlahHari - 1);
 
-  const [c, me, ml, mev, ma, f, lab] = await Promise.all([
+  const [c, me, ml, mev, ma, f, lab, es] = await Promise.all([
     supabase
       .from('daily_checkins')
       .select('*')
@@ -77,6 +79,12 @@ export async function ambilDataRingkasan(
     // lama; kegagalannya hanya mengosongkan bagiannya, bukan menghapus yang
     // lain, jadi keduanya tidak ikut dilaporkan sebagai galat.
     supabase.from('lab_results').select('*').eq('patient_id', patientId).limit(100),
+    supabase
+      .from('med_side_effects')
+      .select('*')
+      .eq('patient_id', patientId)
+      .gte('tanggal', dari)
+      .lte('tanggal', sampai),
   ]);
 
   return {
@@ -89,6 +97,7 @@ export async function ambilDataRingkasan(
     mars: (ma.data ?? []) as MarsAssessment[],
     flares: (f.data ?? []) as FlareCheck[],
     labs: (lab.data ?? []) as LabResult[],
+    efekSamping: (es.data ?? []) as MedSideEffect[],
     error: [c.error, me.error, ml.error, ma.error, f.error].find(Boolean)?.message ?? null,
   };
 }

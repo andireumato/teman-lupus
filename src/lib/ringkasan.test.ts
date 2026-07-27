@@ -6,6 +6,7 @@ import type {
   MedLog,
   Medication,
   MedicationEvent,
+  MedSideEffect,
 } from '@/types/database';
 
 import {
@@ -71,6 +72,19 @@ function medEvent(
   };
 }
 
+function efek(jenis: string, tanggal: string, p: Partial<MedSideEffect> = {}): MedSideEffect {
+  return {
+    id: id(),
+    patient_id: 'p1',
+    medication_id: null,
+    jenis,
+    tanggal,
+    catatan: null,
+    created_at: `${tanggal}T08:00:00+07:00`,
+    ...p,
+  };
+}
+
 function medLog(p: Partial<MedLog> & { tanggal: string }): MedLog {
   return {
     id: id(),
@@ -105,6 +119,7 @@ function input(p: Partial<RingkasanInput> = {}): RingkasanInput {
     meds: [],
     medLogs: [],
     medEvents: [],
+    efekSamping: [],
     mars: [],
     flares: [],
     labs: [],
@@ -672,6 +687,47 @@ describe('kepatuhan obat', () => {
       })
     );
     expect(r.obat.daftar).toEqual([]);
+  });
+
+  it('menggabungkan efek samping per jenis beserta tanggal terakhirnya', () => {
+    const r = buatRingkasan(
+      input({
+        efekSamping: [
+          efek('mual', '2026-07-10'),
+          efek('mual', '2026-07-14'),
+          efek('mual', '2026-07-12'),
+          efek('sulit_tidur', '2026-07-20'),
+        ],
+      })
+    );
+    expect(r.obat.efekSamping).toEqual([
+      { jenis: 'mual', label: 'Mual atau muntah', jumlah: 3, terakhir: '2026-07-14' },
+      { jenis: 'sulit_tidur', label: 'Sulit tidur', jumlah: 1, terakhir: '2026-07-20' },
+    ]);
+  });
+
+  it('efek samping di luar periode diabaikan', () => {
+    const r = buatRingkasan(input({ efekSamping: [efek('mual', '2026-06-20')] }));
+    expect(r.obat.efekSamping).toEqual([]);
+  });
+
+  it('jenis yang tidak dikenal tetap ditampilkan apa adanya', () => {
+    // Daftar efek samping bisa berubah; laporan lama tidak boleh hilang.
+    const r = buatRingkasan(input({ efekSamping: [efek('jenis_lama', '2026-07-10')] }));
+    expect(r.obat.efekSamping[0].label).toBe('jenis_lama');
+  });
+
+  it('efek samping tidak ikut masuk gejala bagian 2', () => {
+    // Keluhan yang sama bisa datang dari lupusnya atau dari obatnya; yang
+    // membedakan penilaian dokter, bukan aplikasi.
+    const r = buatRingkasan(
+      input({
+        efekSamping: [efek('rambut_rontok', '2026-07-10')],
+        checkins: [checkin({ tanggal: '2026-07-10', gejala: [] })],
+      })
+    );
+    expect(Object.values(r.gejala).flat()).toHaveLength(0);
+    expect(r.obat.efekSamping).toHaveLength(1);
   });
 
   it('mengambil MARS-5 terbaru di dalam periode saja', () => {
