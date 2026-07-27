@@ -38,6 +38,13 @@ REST: tabel terbaca (HTTP 200) dan RLS aktif — insert tanpa login ditolak
 layar ringkasan menampilkan pesan yang menyebut nama file SQL-nya, sementara
 enam bagian ringkasan lain tetap jalan.
 
+Tabel `med_side_effects` (efek samping) dan skema sisi dokter
+(`profiles.kode_dokter`, fungsi `tautkan_dokter`, RLS akses profil) **sudah
+dibuat** 27 Juli 2026 lewat Dashboard SQL Editor, dengan isi
+`supabase/efek_samping.sql` dan `supabase/sisi_dokter.sql` apa adanya.
+Diverifikasi lewat REST: keduanya terbaca (HTTP 200) dan RLS aktif — insert
+tanpa login ditolak `42501`.
+
 Skema obat diperbarui 27 Juli 2026 lewat Dashboard SQL Editor dengan isi
 `supabase/obat_frekuensi_dan_riwayat.sql`: kolom `medications.frekuensi` dan
 tabel `medication_events`. Diverifikasi lewat REST: keduanya terbaca (HTTP 200)
