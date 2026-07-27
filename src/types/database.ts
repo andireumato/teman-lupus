@@ -13,6 +13,11 @@ export type Profile = {
   role: Role;
   nama: string | null;
   no_hp: string | null;
+  /**
+   * Kode yang dibagikan dokter agar pasien bisa menautkan diri. NULL untuk
+   * pasien. Lihat supabase/sisi_dokter.sql.
+   */
+  kode_dokter: string | null;
   /** NULL = pasien belum menyetujui informed consent. */
   consent_at: string | null;
   consent_version: string | null;
@@ -208,7 +213,16 @@ export type Database = {
       medication_events: Row<MedicationEvent>;
     };
     Views: { [_ in never]: never };
-    Functions: { [_ in never]: never };
+    Functions: {
+      /**
+       * Dipanggil pasien untuk menautkan diri ke dokter lewat kode.
+       * `security definer` — lihat supabase/sisi_dokter.sql.
+       */
+      tautkan_dokter: {
+        Args: { kode: string };
+        Returns: { nama_dokter: string | null }[];
+      };
+    };
     Enums: { [_ in never]: never };
     CompositeTypes: { [_ in never]: never };
   };

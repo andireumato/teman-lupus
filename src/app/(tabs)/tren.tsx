@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { Link, useFocusEffect } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { DokterSaya } from '@/components/dokter-saya';
 import {
   Card,
   Disclaimer,
@@ -285,6 +286,8 @@ export default function TrenScreen() {
           </Text>
         </Pressable>
       </Link>
+
+      <DokterSaya patientId={patientId} />
 
       <Card>
         <SectionLabel>Akun</SectionLabel>

@@ -77,6 +77,7 @@ Bila suatu saat perlu menyiapkan project Supabase dari nol:
    - `supabase/unique_checkin_per_hari.sql`
    - `supabase/visit_questions.sql`
    - `supabase/obat_frekuensi_dan_riwayat.sql`
+   - `supabase/sisi_dokter.sql`
 3. Salin Project URL & anon key ke `.env`.
 
 ---
@@ -91,7 +92,7 @@ npm start                 # lalu tekan i (iOS) / a (Android), atau pindai QR den
 
 | Perintah            | Fungsi                                         |
 | ------------------- | ---------------------------------------------- |
-| `npm test`          | Unit test (red-flag, ringkasan, MARS-5, UV, beranda, tanggal) — 177 test |
+| `npm test`          | Unit test (red-flag, ringkasan, SLEDAI, MARS-5, UV, grafik, kode, tanggal) — 212 test |
 | `npm run typecheck` | Cek tipe TypeScript                            |
 | `npm run lint`      | ESLint + Prettier                              |
 | `npm run format`    | Rapikan format kode                            |
@@ -114,6 +115,11 @@ src/
     checkin.tsx           formulir check-in harian + layar apresiasi
     mars.tsx              kuesioner MARS-5
     ringkasan.tsx         ringkasan pra-kunjungan (Bagian 8 spesifikasi)
+    dokter/               sisi dokter (hanya untuk role 'doctor')
+      index.tsx           daftar pasien tertaut
+      akun.tsx            kode dokter & keluar
+      pasien/[id].tsx     ringkasan pra-kunjungan satu pasien
+      sledai/[id].tsx     formulir SLEDAI-2K
     (tabs)/
       index.tsx           Beranda
       flare.tsx           Cek Flare (triase tanda bahaya)
@@ -123,6 +129,9 @@ src/
   lib/
     redflag.ts            red-flag engine [DETERMINISTIK]
     ringkasan.ts          perakit ringkasan pra-kunjungan + versi teksnya
+    ringkasan-data.ts     pengambilan datanya (dipakai pasien & dokter)
+    sledai.ts             skoring SLEDAI-2K
+    kode.ts               kode dokter: bentuk, validasi, pembuatan
     grafik.ts             geometri grafik garis (murni, tanpa React)
     beranda.ts            salam, konten harian, tingkatan streak, insight
     uv.ts                 kategori indeks UV + pengambilan Open-Meteo
@@ -132,9 +141,13 @@ src/
     supabase.ts           klien Supabase
   constants/
     lupus.ts              gejala per sistem organ, panel lab & nilai rujukan
+    sledai.ts             24 deskriptor SLEDAI-2K + bobotnya
     edukasi.ts            kutipan harian + tips lupus
     consent.ts            naskah informed consent + versinya
     brand.ts              palet warna
+  components/
+    ringkasan-isi.tsx     tampilan 7 bagian ringkasan (dipakai pasien & dokter)
+    dokter-saya.tsx       kartu penautan dokter di layar Tren
   types/database.ts       bentuk tabel Supabase
 supabase/                 SQL pelengkap yang belum ada di skema awal
 ```
@@ -395,6 +408,46 @@ ringkasan lain tetap jalan.
 
 ---
 
+## Sisi dokter
+
+Pengguna dengan peran `doctor` masuk ke `/dokter`, bukan ke tab pasien —
+penjaga rute di `app/_layout.tsx` yang memisahkannya, dan pasien yang mengetik
+alamat `/dokter` dilempar kembali.
+
+**Penautan pasien–dokter.** Dokter punya kode 6 karakter (`profiles.kode_dokter`)
+yang dibagikan ke pasiennya; pasien memasukkannya di tab **Tren → Dokter saya**.
+Yang memulai adalah PASIEN, sejalan dengan naskah consent: dia memilih
+membagikan datanya, bukan ditambahkan diam-diam ke daftar seseorang. Pasien
+bisa melepas tautan kapan saja.
+
+Penautan lewat fungsi `tautkan_dokter()` di database (`security definer`),
+bukan `select` biasa ke `profiles`. Alasannya: untuk mencari dokter dari kode,
+pasien perlu membaca baris profil orang lain — dan kalau itu dibuka lewat RLS,
+siapa pun yang login bisa menelusuri daftar pengguna. Dengan fungsi, pencarian
+terjadi di dalam database dan yang keluar hanya hasil penautannya.
+
+Abjad kodenya membuang karakter yang mudah tertukar (0/O, 1/I/L, 5/S, 8/B)
+karena kode ini dibacakan dan diketik ulang. Keunikan dijamin unique index,
+bukan keberuntungan: bila kode bentrok, aplikasi mencoba kode lain.
+
+**Yang dilihat dokter** adalah ringkasan pra-kunjungan yang sama persis dengan
+yang dilihat pasien — komponen tampilannya satu (`components/ringkasan-isi.tsx`)
+dan pengambilan datanya satu (`lib/ringkasan-data.ts`). Kalau masing-masing
+punya salinannya sendiri, dokter dan pasien bisa duduk berhadapan membahas dua
+ringkasan yang berbeda isinya.
+
+**SLEDAI-2K** (`constants/sledai.ts` + `lib/sledai.ts`) diisi dokter, skor
+dihitung otomatis dari bobot deskriptor. Bobotnya bagian dari instrumen —
+mengubahnya berarti bukan SLEDAI-2K lagi — dan dijaga test: 8×bobot 8,
+6×bobot 4, 7×bobot 2, 3×bobot 1, maksimum 105. Kunci yang tidak dikenal
+melempar, bukan diabaikan diam-diam.
+
+> ⚠️ **Wajib diverifikasi reumatolog:** daftar 24 deskriptor beserta
+> terjemahannya, dan terutama **ambang kategori** (Ringan 1–5, Sedang 6–10,
+> Tinggi 11–19, Sangat tinggi ≥20) yang **tidak baku** antar sumber.
+
+---
+
 ## Red-flag engine — bagian paling penting
 
 `src/lib/redflag.ts` mengimplementasikan Bagian 6 spesifikasi MVP. Keputusan
@@ -450,6 +503,7 @@ aplikasi ini:
 | `unique_checkin_per_hari.sql` | Unique `(patient_id, tanggal)` agar upsert check-in bekerja      |
 | `visit_questions.sql`         | Pertanyaan pasien untuk kunjungan (bagian 6 ringkasan)          |
 | `obat_frekuensi_dan_riwayat.sql` | Frekuensi dosis, dosis ke-berapa, & riwayat berhenti/lanjut  |
+| `sisi_dokter.sql`             | Kode dokter, fungsi penautan, RLS akses profil                  |
 
 Semuanya aman dijalankan ulang. `unique_checkin_per_hari.sql` berisi query untuk
 memeriksa duplikat lebih dulu — baca komentarnya sebelum menjalankan.

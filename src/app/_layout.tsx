@@ -11,11 +11,15 @@ SplashScreen.preventAutoHideAsync();
 
 /**
  * Penjaga rute: menentukan layar mana yang boleh dilihat berdasarkan
- * status login dan status persetujuan.
+ * status login, peran, dan status persetujuan.
  *
- *   belum login          → /login
- *   login, belum consent → /consent
- *   login + consent      → (tabs)
+ *   belum login           → /login
+ *   dokter                → /dokter
+ *   pasien, belum consent → /consent
+ *   pasien + consent      → (tabs)
+ *
+ * Consent hanya berlaku bagi pasien: naskahnya tentang penggunaan data
+ * pribadi pasien, dan dokter tidak menyerahkan datanya sendiri di sini.
  */
 function AuthGate() {
   const { session, profile, loading, consentValid } = useSession();
@@ -29,6 +33,7 @@ function AuthGate() {
     const seg = segments[0];
     const diLogin = seg === 'login';
     const diConsent = seg === 'consent';
+    const diDokter = seg === 'dokter';
 
     if (!session) {
       if (!diLogin) router.replace('/login');
@@ -37,6 +42,17 @@ function AuthGate() {
 
     // Profil belum sempat termuat — tunggu, jangan lempar ke mana-mana.
     if (!profile) return;
+
+    if (profile.role === 'doctor') {
+      if (!diDokter) router.replace('/dokter');
+      return;
+    }
+
+    // Pasien tidak boleh masuk ke rute dokter meski mengetik alamatnya.
+    if (diDokter) {
+      router.replace('/');
+      return;
+    }
 
     if (!consentValid) {
       if (!diConsent) router.replace('/consent');
@@ -61,6 +77,7 @@ function AuthGate() {
       <Stack.Screen name="checkin" options={{ title: 'Check-in Harian' }} />
       <Stack.Screen name="mars" options={{ title: 'Kuesioner MARS-5' }} />
       <Stack.Screen name="ringkasan" options={{ title: 'Ringkasan Pra-Kunjungan' }} />
+      <Stack.Screen name="dokter" options={{ headerShown: false }} />
     </Stack>
   );
 }

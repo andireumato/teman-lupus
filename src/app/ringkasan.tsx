@@ -4,7 +4,6 @@ import { useCallback, useMemo, useState } from 'react';
 import { Platform, Pressable, Share, StyleSheet, Text, View } from 'react-native';
 
 import {
-  Card,
   Disclaimer,
   Field,
   GhostButton,
@@ -13,18 +12,17 @@ import {
   Msg,
   PrimaryButton,
   Screen,
-  SectionLabel,
   Segmented,
 } from '@/components/ui/kit';
+import { RingkasanIsi } from '@/components/ringkasan-isi';
 import { Brand, space } from '@/constants/brand';
 import { DISCLAIMER } from '@/constants/consent';
-import { mundurHari, tanggalPendek, todayISO } from '@/lib/dates';
+import { mundurHari, todayISO } from '@/lib/dates';
 import {
   buatRingkasan,
   idPendek,
   inisialNama,
   ringkasanTeks,
-  type GejalaRingkas,
   type Ringkasan,
 } from '@/lib/ringkasan';
 import { useSession } from '@/lib/session';
@@ -55,8 +53,6 @@ function pesanTabelPertanyaan(pesan: string): string {
     : pesan;
 }
 
-const ARAH_LABEL = { naik: 'naik', turun: 'turun', stabil: 'stabil' } as const;
-
 /** Data mentah dari Supabase, dipisah dari perakitan agar menambah pertanyaan
  *  tidak perlu mengambil ulang seluruh data. */
 interface DataMentah {
@@ -69,26 +65,6 @@ interface DataMentah {
   mars: MarsAssessment[];
   flares: FlareCheck[];
   labs: LabResult[];
-}
-
-function BarisGejala({ judul, list }: { judul: string; list: GejalaRingkas[] }) {
-  return (
-    <View style={styles.grup}>
-      <Text style={styles.grupJudul}>{judul}</Text>
-      {list.length === 0 ? (
-        <Text style={styles.kosong}>—</Text>
-      ) : (
-        list.map((g) => (
-          <Text key={`${g.system}|${g.item}`} style={styles.item}>
-            • {g.item}{' '}
-            <Text style={styles.lembut}>
-              ({g.sistemLabel}, {g.hari} hari)
-            </Text>
-          </Text>
-        ))
-      )}
-    </View>
-  );
 }
 
 export default function RingkasanScreen() {
@@ -288,186 +264,45 @@ export default function RingkasanScreen() {
 
       <Segmented options={PERIODE} value={hari} onChange={setHari} />
 
-      <Card>
-        <Text style={styles.kepala}>
-          {r.kepala.inisial} · ID {r.kepala.id}
-        </Text>
-        <Text style={styles.kepalaSub}>
-          {tanggalPendek(r.kepala.dari)} s/d {tanggalPendek(r.kepala.sampai)}
-        </Text>
-        <Text style={styles.kepalaSub}>
-          {r.kepala.jumlahCheckin} check-in dari {r.kepala.jumlahHari} hari
-        </Text>
-      </Card>
-
-      <Card>
-        <SectionLabel>1. Skor harian</SectionLabel>
-        <Text style={styles.catatanKecil}>
-          Bukan PRO tervalidasi — ini rata-rata dari skala check-in harian.
-        </Text>
-        {r.skor.map((s) => (
-          <View key={s.label} style={styles.grup}>
-            <Text style={styles.grupJudul}>{s.label}</Text>
-            {s.akhir == null ? (
-              <Text style={styles.kosong}>Belum ada data.</Text>
-            ) : (
-              <>
-                <Text style={styles.item}>
-                  Terkini {s.akhir} · awal periode {s.awal ?? '–'} · tren {ARAH_LABEL[s.arah]}
-                </Text>
-                <Text style={styles.lembut}>
-                  Per minggu: {s.mingguan.map((m) => (m == null ? '–' : m)).join(' → ')}
-                </Text>
-              </>
-            )}
-          </View>
-        ))}
-      </Card>
-
-      <Card>
-        <SectionLabel>2. Gejala menonjol</SectionLabel>
-        <BarisGejala judul="Baru muncul" list={r.gejala.baru} />
-        <BarisGejala judul="Makin sering" list={r.gejala.memburuk} />
-        <BarisGejala judul="Menetap" list={r.gejala.menetap} />
-        <BarisGejala judul="Berkurang" list={r.gejala.membaik} />
-      </Card>
-
-      <Card>
-        <SectionLabel>3. Perubahan & waktunya</SectionLabel>
-        <Text style={styles.catatanKecil}>
-          Hitungan hari dari catatanmu sendiri, bukan kesimpulan medis. Bila ada tanda bahaya,
-          gunakan Cek Flare.
-        </Text>
-        {r.perubahan.length === 0 ? (
-          <Text style={styles.kosong}>Data belum cukup untuk membandingkan dua periode.</Text>
-        ) : (
-          r.perubahan.map((p) => (
-            <Text key={p} style={styles.item}>
-              • {p}
+      <RingkasanIsi
+        r={r}
+        catatanBagian3="Hitungan hari dari catatanmu sendiri, bukan kesimpulan medis. Bila ada tanda bahaya, gunakan Cek Flare."
+        slotPertanyaan={
+          <>
+            <Text style={styles.catatanKecil}>
+              Tersimpan di akunmu, jadi tetap ada meski aplikasi dipasang ulang. Ikut tercetak di
+              ringkasan dan terbaca dokter yang tertaut.
             </Text>
-          ))
-        )}
-      </Card>
-
-      <Card>
-        <SectionLabel>4. Obat</SectionLabel>
-        <Text style={styles.item}>
-          • <Text style={styles.tebal}>Sedang diminum:</Text>{' '}
-          {r.obat.sedangDiminum.length === 0
-            ? 'tidak ada obat aktif'
-            : r.obat.sedangDiminum.map((o) => `${o.nama} (${o.frekuensi}x/hari)`).join(', ')}
-        </Text>
-        {r.obat.perubahan.length > 0 && (
-          <Text style={styles.item}>
-            • <Text style={styles.tebal}>Perubahan:</Text>{' '}
-            {r.obat.perubahan.map((o) => `${o.nama} ${o.teks}`).join('; ')}
-          </Text>
-        )}
-        {r.obat.dosis.tercatat > 0 && (
-          <Text style={styles.item}>
-            • <Text style={styles.tebal}>Dosis diminum:</Text> {r.obat.dosis.diminum} dari{' '}
-            {r.obat.dosis.tercatat} yang tercatat
-            {r.obat.dosis.terlewat.length > 0
-              ? `; terlewat: ${r.obat.dosis.terlewat.map((o) => `${o.nama} ${o.jumlah}`).join(', ')}`
-              : ''}
-          </Text>
-        )}
-        <Text style={styles.item}>
-          •{' '}
-          {r.obat.mars
-            ? `MARS-5 ${r.obat.mars.total}/25 ${r.obat.mars.kategori} (${tanggalPendek(r.obat.mars.tanggal)})`
-            : 'MARS-5 belum diisi'}
-          {r.obat.hariTanpaCatatan > 0
-            ? ` · ${r.obat.hariTanpaCatatan} dari ${r.kepala.jumlahHari} hari tanpa catatan`
-            : ''}
-        </Text>
-        {r.obat.alasan.map((a) => (
-          <Text key={a.id} style={styles.item}>
-            • Alasan: {tanggalPendek(a.tanggal)} {a.teks}
-          </Text>
-        ))}
-      </Card>
-
-      <Card>
-        <SectionLabel>5. Event red-flag</SectionLabel>
-        {r.redflag.length === 0 ? (
-          <Text style={styles.kosong}>Tidak ada peringatan pada periode ini.</Text>
-        ) : (
-          r.redflag.map((e) => (
-            <View key={e.id} style={styles.event}>
-              <View style={styles.eventHead}>
-                <Text style={styles.eventTanggal}>{tanggalPendek(e.waktu)}</Text>
-                <View
-                  style={[
-                    styles.badge,
-                    { backgroundColor: e.level === 'darurat' ? Brand.merah : Brand.kuning },
-                  ]}
+            {tanyaErr && <Msg tone="err">{tanyaErr}</Msg>}
+            {pertanyaan.map((p) => (
+              <View key={p.id} style={styles.tanya}>
+                <Text style={styles.tanyaTeks}>• {p.teks}</Text>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Hapus pertanyaan: ${p.teks}`}
+                  hitSlop={8}
+                  onPress={() => void hapusPertanyaan(p)}
                 >
-                  <Text style={styles.badgeText}>{e.level}</Text>
-                </View>
+                  <Text style={styles.hapus}>Hapus</Text>
+                </Pressable>
               </View>
-              <Text style={styles.lembut}>
-                {e.tanda.length > 0 ? e.tanda.join(', ') : 'Tanpa tanda tercentang'}
-              </Text>
-            </View>
-          ))
-        )}
-      </Card>
-
-      <Card>
-        <SectionLabel>6. Pertanyaan untuk dokter</SectionLabel>
-        <Text style={styles.catatanKecil}>
-          Tersimpan di akunmu, jadi tetap ada meski aplikasi dipasang ulang. Ikut tercetak di
-          ringkasan.
-        </Text>
-        {tanyaErr && <Msg tone="err">{tanyaErr}</Msg>}
-        {pertanyaan.map((p) => (
-          <View key={p.id} style={styles.tanya}>
-            <Text style={styles.tanyaTeks}>• {p.teks}</Text>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`Hapus pertanyaan: ${p.teks}`}
-              hitSlop={8}
-              onPress={() => void hapusPertanyaan(p)}
-            >
-              <Text style={styles.hapus}>Hapus</Text>
-            </Pressable>
-          </View>
-        ))}
-        <Field
-          label="Tambah pertanyaan"
-          value={draf}
-          onChangeText={setDraf}
-          placeholder="mis. Apakah boleh berjemur pagi?"
-          onSubmitEditing={() => void tambahPertanyaan()}
-          returnKeyType="done"
-        />
-        <GhostButton
-          label="＋ Tambahkan"
-          onPress={() => void tambahPertanyaan()}
-          disabled={busy || draf.trim().length === 0}
-        />
-
-        {r.pertanyaan.catatan.length > 0 && (
-          <View style={styles.grup}>
-            <Text style={styles.grupJudul}>Dari catatan check-in</Text>
-            {r.pertanyaan.catatan.map((c) => (
-              <Text key={c.tanggal} style={styles.item}>
-                • {tanggalPendek(c.tanggal)}: {c.teks}
-              </Text>
             ))}
-          </View>
-        )}
-      </Card>
-
-      <Card>
-        <SectionLabel>7. Pemantauan</SectionLabel>
-        {r.pemantauan.map((p) => (
-          <Text key={p} style={styles.item}>
-            • {p}
-          </Text>
-        ))}
-      </Card>
+            <Field
+              label="Tambah pertanyaan"
+              value={draf}
+              onChangeText={setDraf}
+              placeholder="mis. Apakah boleh berjemur pagi?"
+              onSubmitEditing={() => void tambahPertanyaan()}
+              returnKeyType="done"
+            />
+            <GhostButton
+              label="＋ Tambahkan"
+              onPress={() => void tambahPertanyaan()}
+              disabled={busy || draf.trim().length === 0}
+            />
+          </>
+        }
+      />
 
       <Msg tone="info">
         Teks yang dibagikan berisi data kesehatanmu. Kirim hanya kepada dokter atau tim yang kamu
