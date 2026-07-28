@@ -18,6 +18,7 @@ export default function DokterLayout() {
       }}
     >
       <Stack.Screen name="index" options={{ title: 'Pasien Saya' }} />
+      <Stack.Screen name="peringatan" options={{ title: 'Peringatan' }} />
       <Stack.Screen name="akun" options={{ title: 'Akun Dokter' }} />
       <Stack.Screen name="pasien/[id]" options={{ title: 'Ringkasan Pasien' }} />
       <Stack.Screen name="sledai/[id]" options={{ title: 'SLEDAI-2K' }} />

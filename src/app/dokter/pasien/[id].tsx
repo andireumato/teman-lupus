@@ -11,17 +11,19 @@ import {
   Loading,
   Msg,
   PrimaryButton,
+  Field,
   Screen,
   SectionLabel,
   Segmented,
 } from '@/components/ui/kit';
 import { Brand, space } from '@/constants/brand';
 import { DISCLAIMER } from '@/constants/consent';
-import { tanggalPendek } from '@/lib/dates';
+import { selisihHari, tanggalPendek, todayISO } from '@/lib/dates';
 import { buatRingkasan, idPendek, inisialNama, ringkasanTeks } from '@/lib/ringkasan';
 import { ambilDataRingkasan, type DataRingkasan } from '@/lib/ringkasan-data';
+import { useSession } from '@/lib/session';
 import { supabase } from '@/lib/supabase';
-import type { Patient, Profile, SledaiAssessment, VisitQuestion } from '@/types/database';
+import type { Patient, Profile, SledaiAssessment, Visit, VisitQuestion } from '@/types/database';
 
 const PERIODE = [
   { v: 30, label: '30 hari' },
@@ -31,6 +33,7 @@ const PERIODE = [
 export default function DetailPasienScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const { session } = useSession();
 
   const [hari, setHari] = useState(30);
   const [loading, setLoading] = useState(true);
@@ -38,6 +41,10 @@ export default function DetailPasienScreen() {
   const [pasien, setPasien] = useState<{ nama: string | null; pat: Patient } | null>(null);
   const [pertanyaan, setPertanyaan] = useState<VisitQuestion[]>([]);
   const [sledai, setSledai] = useState<SledaiAssessment[]>([]);
+  const [kunjungan, setKunjungan] = useState<Visit[]>([]);
+  const [catatKunjungan, setCatatKunjungan] = useState(false);
+  const [catatan, setCatatan] = useState('');
+  const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
 
@@ -61,7 +68,7 @@ export default function DetailPasienScreen() {
     }
 
     const p = pat as Patient;
-    const [prof, tanya, sl, ringkas] = await Promise.all([
+    const [prof, tanya, sl, kj, ringkas] = await Promise.all([
       supabase.from('profiles').select('nama').eq('id', p.profile_id).maybeSingle(),
       supabase
         .from('visit_questions')
@@ -74,12 +81,19 @@ export default function DetailPasienScreen() {
         .eq('patient_id', p.id)
         .order('tanggal', { ascending: false })
         .limit(10),
+      supabase
+        .from('visits')
+        .select('*')
+        .eq('patient_id', p.id)
+        .order('tanggal', { ascending: false })
+        .limit(10),
       ambilDataRingkasan(p.id, hari),
     ]);
 
     setPasien({ nama: (prof.data as Pick<Profile, 'nama'> | null)?.nama ?? null, pat: p });
     setPertanyaan((tanya.data ?? []) as VisitQuestion[]);
     setSledai((sl.data ?? []) as SledaiAssessment[]);
+    setKunjungan((kj.data ?? []) as Visit[]);
     setData(ringkas);
     setErr(ringkas.error);
     setLoading(false);
@@ -99,6 +113,26 @@ export default function DetailPasienScreen() {
       pertanyaan: pertanyaan.map((p) => p.teks),
     });
   }, [data, pasien, pertanyaan]);
+
+  async function simpanKunjungan() {
+    if (!id) return;
+    setBusy(true);
+    setErr(null);
+    const { error } = await supabase.from('visits').insert({
+      patient_id: id,
+      doctor_id: session?.user.id ?? null,
+      tanggal: todayISO(),
+      catatan: catatan.trim() || null,
+    });
+    setBusy(false);
+    if (error) {
+      setErr(`Gagal menyimpan kunjungan: ${error.message}`);
+      return;
+    }
+    setCatatan('');
+    setCatatKunjungan(false);
+    await muat();
+  }
 
   async function bagikan() {
     if (!ringkasan) return;
@@ -153,6 +187,50 @@ export default function DetailPasienScreen() {
       <Segmented options={PERIODE} value={hari} onChange={setHari} />
 
       <Card>
+        <SectionLabel>Kunjungan</SectionLabel>
+        {kunjungan.length === 0 ? (
+          <Text style={styles.kosong}>Belum ada kunjungan tercatat.</Text>
+        ) : (
+          <Text style={styles.kosong}>
+            Kunjungan terakhir {selisihHari(kunjungan[0].tanggal, todayISO())} hari lalu.
+          </Text>
+        )}
+        {kunjungan.length > 0 &&
+          kunjungan.map((k) => (
+            <View key={k.id} style={styles.baris}>
+              <Text style={styles.barisTanggal}>{tanggalPendek(k.tanggal)}</Text>
+              <Text style={styles.barisNilai} numberOfLines={2}>
+                {k.catatan ?? '—'}
+              </Text>
+            </View>
+          ))}
+        {catatKunjungan ? (
+          <>
+            <Field
+              label="Catatan kunjungan (opsional)"
+              value={catatan}
+              onChangeText={setCatatan}
+              placeholder="mis. tapering metilprednisolon, kontrol 4 minggu"
+              multiline
+              numberOfLines={3}
+              style={styles.catatan}
+            />
+            <PrimaryButton
+              label="Simpan kunjungan hari ini"
+              onPress={() => void simpanKunjungan()}
+              loading={busy}
+            />
+            <GhostButton label="Batal" onPress={() => setCatatKunjungan(false)} />
+          </>
+        ) : (
+          <GhostButton
+            label="＋ Catat kunjungan hari ini"
+            onPress={() => setCatatKunjungan(true)}
+          />
+        )}
+      </Card>
+
+      <Card>
         <SectionLabel>SLEDAI-2K</SectionLabel>
         {sledai.length === 0 ? (
           <Text style={styles.kosong}>Belum pernah dinilai.</Text>
@@ -204,5 +282,6 @@ const styles = StyleSheet.create({
     gap: space.sm,
   },
   barisTanggal: { fontSize: 12.5, color: Brand.teksLembut },
-  barisNilai: { fontSize: 13, fontWeight: '600', color: Brand.teks },
+  barisNilai: { flex: 1, fontSize: 13, fontWeight: '600', color: Brand.teks, textAlign: 'right' },
+  catatan: { minHeight: 70, textAlignVertical: 'top', paddingTop: 10 },
 });

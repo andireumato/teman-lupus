@@ -199,8 +199,15 @@ export type MedSideEffect = {
 export type Alert = {
   id: string;
   patient_id: string;
+  /**
+   * Cek Flare yang memicunya. NULL untuk peringatan dari sumber lain.
+   * Lihat supabase/alerts_kunjungan.sql.
+   */
+  flare_check_id: string | null;
+  /** 'flare_darurat' | 'flare_mendesak' untuk peringatan dari Cek Flare. */
   jenis: string | null;
   pesan: string | null;
+  /** True bila dokter sudah menindaklanjutinya. */
   selesai: boolean;
   created_at: string;
 };

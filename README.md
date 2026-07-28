@@ -86,6 +86,7 @@ Bila suatu saat perlu menyiapkan project Supabase dari nol:
    - `supabase/obat_frekuensi_dan_riwayat.sql`
    - `supabase/sisi_dokter.sql`
    - `supabase/efek_samping.sql`
+   - `supabase/alerts_kunjungan.sql`
 3. Salin Project URL & anon key ke `.env`.
 
 ---
@@ -100,7 +101,7 @@ npm start                 # lalu tekan i (iOS) / a (Android), atau pindai QR den
 
 | Perintah            | Fungsi                                         |
 | ------------------- | ---------------------------------------------- |
-| `npm test`          | Unit test (red-flag, ringkasan, SLEDAI, MARS-5, UV, grafik, kode, tanggal) — 212 test |
+| `npm test`          | Unit test (red-flag, ringkasan, SLEDAI, MARS-5, UV, grafik, kode, tanggal) — 214 test |
 | `npm run typecheck` | Cek tipe TypeScript                            |
 | `npm run lint`      | ESLint + Prettier                              |
 | `npm run format`    | Rapikan format kode                            |
@@ -127,6 +128,7 @@ src/
     dokter/               sisi dokter (hanya untuk role 'doctor')
       index.tsx           daftar pasien tertaut
       akun.tsx            kode dokter & keluar
+      peringatan.tsx      kotak masuk peringatan Cek Flare
       pasien/[id].tsx     ringkasan pra-kunjungan satu pasien
       sledai/[id].tsx     formulir SLEDAI-2K
     (tabs)/
@@ -470,6 +472,29 @@ dan pengambilan datanya satu (`lib/ringkasan-data.ts`). Kalau masing-masing
 punya salinannya sendiri, dokter dan pasien bisa duduk berhadapan membahas dua
 ringkasan yang berbeda isinya.
 
+**Peringatan** dibuat **oleh trigger database**, bukan oleh aplikasi. Saat Cek
+Flare menghasilkan kuning atau merah, `on_flare_check_alert` menyisipkan baris
+`alerts` menyatu dengan penyimpanan cek flare-nya.
+
+Kenapa bukan dari aplikasi: satu kegagalan jaringan sesudah `flare_checks`
+tersimpan akan menghasilkan cek flare merah yang tidak pernah muncul di kotak
+masuk dokter — gagal diam-diam, pada jalur yang justru paling tidak boleh gagal
+diam-diam. Ini tidak mengubah jalur eskalasi pasien: pesan "segera ke IGD"
+tetap dihitung di perangkat oleh `redflag.ts` dan tampil tanpa menunggu
+jaringan. Peringatan hanya salinan untuk dokter.
+
+`alerts.flare_check_id` dengan unique index membuat trigger, penyisipan ulang,
+maupun menjalankan skrip dua kali tidak menggandakan kotak masuk. Skrip juga
+mengisi peringatan untuk cek flare kuning/merah yang tersimpan sebelum trigger
+dipasang.
+
+Hitungan peringatan terbuka di daftar pasien sengaja **tanpa batas waktu**,
+berbeda dengan penanda 30 hari di kartu pasien: peringatan darurat dari dua
+bulan lalu yang belum ditindaklanjuti tetap harus terlihat.
+
+**Kunjungan** dicatat dokter di layar detail pasien (`visits`), dan layar itu
+menampilkan berapa hari sejak kunjungan terakhir.
+
 **SLEDAI-2K** (`constants/sledai.ts` + `lib/sledai.ts`) diisi dokter, skor
 dihitung otomatis dari bobot deskriptor. Bobotnya bagian dari instrumen —
 mengubahnya berarti bukan SLEDAI-2K lagi — dan dijaga test: 8×bobot 8,
@@ -560,6 +585,7 @@ aplikasi ini:
 | `obat_frekuensi_dan_riwayat.sql` | Frekuensi dosis, dosis ke-berapa, & riwayat berhenti/lanjut  |
 | `sisi_dokter.sql`             | Kode dokter, fungsi penautan, RLS akses profil                  |
 | `efek_samping.sql`            | Tabel efek samping obat yang dilaporkan pasien                   |
+| `alerts_kunjungan.sql`        | Trigger peringatan dari Cek Flare + tautan ke cek flare asalnya  |
 
 Semuanya aman dijalankan ulang. `unique_checkin_per_hari.sql` berisi query untuk
 memeriksa duplikat lebih dulu — baca komentarnya sebelum menjalankan.

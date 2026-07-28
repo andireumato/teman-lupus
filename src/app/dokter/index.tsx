@@ -8,7 +8,7 @@ import { Brand, radius, space } from '@/constants/brand';
 import { hitungStreak, mundurHari, tanggalPendek, todayISO } from '@/lib/dates';
 import { useSession } from '@/lib/session';
 import { supabase } from '@/lib/supabase';
-import type { DailyCheckin, FlareCheck, Patient, Profile } from '@/types/database';
+import type { Alert, DailyCheckin, FlareCheck, Patient, Profile } from '@/types/database';
 
 /** Berapa hari ke belakang yang diringkas pada kartu daftar. */
 const JENDELA = 30;
@@ -30,6 +30,7 @@ export default function DaftarPasienScreen() {
 
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<BarisPasien[]>([]);
+  const [terbuka, setTerbuka] = useState(0);
   const [err, setErr] = useState<string | null>(null);
 
   const muat = useCallback(async () => {
@@ -55,6 +56,7 @@ export default function DaftarPasienScreen() {
     const daftar = (pasien ?? []) as Patient[];
     if (daftar.length === 0) {
       setRows([]);
+      setTerbuka(0);
       setLoading(false);
       return;
     }
@@ -65,7 +67,7 @@ export default function DaftarPasienScreen() {
 
     // Tiga kueri untuk semua pasien sekaligus, bukan tiga kueri per pasien:
     // daftar 30 pasien akan berarti 90 permintaan jaringan.
-    const [prof, checkins, flares] = await Promise.all([
+    const [prof, checkins, flares, alerts] = await Promise.all([
       supabase.from('profiles').select('id,nama').in('id', profileIds),
       supabase
         .from('daily_checkins')
@@ -77,6 +79,9 @@ export default function DaftarPasienScreen() {
         .select('patient_id,hasil,waktu')
         .in('patient_id', patientIds)
         .gte('waktu', `${dari}T00:00:00`),
+      // Peringatan terbuka dihitung TANPA batas waktu: peringatan darurat
+      // dari dua bulan lalu yang belum ditindaklanjuti tetap harus terlihat.
+      supabase.from('alerts').select('id').in('patient_id', patientIds).eq('selesai', false),
     ]);
 
     const nama = new Map(
@@ -113,6 +118,7 @@ export default function DaftarPasienScreen() {
         (b.terakhir ?? '').localeCompare(a.terakhir ?? '')
     );
     setRows(hasil);
+    setTerbuka(((alerts.data ?? []) as Pick<Alert, 'id'>[]).length);
     setLoading(false);
   }, [session?.user.id]);
 
@@ -132,6 +138,25 @@ export default function DaftarPasienScreen() {
       </InfoBar>
 
       {err && <Msg tone="err">{err}</Msg>}
+
+      <Link href="/dokter/peringatan" asChild>
+        <Pressable style={[styles.akunCard, terbuka > 0 && styles.peringatanAda]}>
+          <Ionicons
+            name={terbuka > 0 ? 'alert-circle' : 'checkmark-circle-outline'}
+            size={18}
+            color={terbuka > 0 ? Brand.merah : Brand.hijau}
+          />
+          <View style={styles.akunTeks}>
+            <Text style={[styles.akunJudul, terbuka > 0 && styles.peringatanJudul]}>
+              {terbuka > 0 ? `${terbuka} peringatan belum ditindaklanjuti` : 'Tidak ada peringatan'}
+            </Text>
+            <Text style={styles.akunSub}>
+              Dari Cek Flare pasien yang menghasilkan tingkat mendesak atau darurat.
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={Brand.teksLembut} />
+        </Pressable>
+      </Link>
 
       <Link href="/dokter/akun" asChild>
         <Pressable style={styles.akunCard}>
@@ -212,6 +237,8 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     padding: space.lg,
   },
+  peringatanAda: { backgroundColor: Brand.merahMuda, borderColor: '#fecaca' },
+  peringatanJudul: { color: Brand.merah },
   akunTeks: { flex: 1, gap: 2 },
   akunJudul: { fontSize: 15, fontWeight: '700', color: Brand.ungu },
   akunSub: { fontSize: 12.5, color: '#5b5566', lineHeight: 18 },
