@@ -140,7 +140,13 @@ export default function DaftarPasienScreen() {
       {err && <Msg tone="err">{err}</Msg>}
 
       <Link href="/dokter/peringatan" asChild>
-        <Pressable style={[styles.akunCard, terbuka > 0 && styles.peringatanAda]}>
+        {/*
+          StyleSheet.flatten wajib di sini: <Link asChild> mengkloning anaknya
+          dan menolak `style` berbentuk array.
+        */}
+        <Pressable
+          style={StyleSheet.flatten([styles.akunCard, terbuka > 0 && styles.peringatanAda])}
+        >
           <Ionicons
             name={terbuka > 0 ? 'alert-circle' : 'checkmark-circle-outline'}
             size={18}
