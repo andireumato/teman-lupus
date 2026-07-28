@@ -35,14 +35,14 @@ describe('daftar deskriptor', () => {
 
 describe('scoreSledai', () => {
   it('tanpa deskriptor apa pun bernilai nol', () => {
-    expect(scoreSledai({})).toEqual({ total: 0, kategori: 'Tidak ada aktivitas', aktif: [] });
+    expect(scoreSledai({})).toEqual({ total: 0, kategori: 'Remisi', aktif: [] });
   });
 
   it('menjumlahkan bobot deskriptor yang dicentang', () => {
     // 8 (kejang) + 4 (artritis) + 2 (ruam) + 1 (demam) = 15
     const s = scoreSledai({ kejang: true, artritis: true, ruam: true, demam: true });
     expect(s.total).toBe(15);
-    expect(s.kategori).toBe('Tinggi');
+    expect(s.kategori).toBe('Berat');
   });
 
   it('nilai false tidak ikut dihitung', () => {
@@ -68,16 +68,16 @@ describe('scoreSledai', () => {
 });
 
 describe('kategoriSledai', () => {
+  // Batasnya mengikuti Carter dkk. 2016 sebagaimana dikutip Suszek dkk. 2024:
+  // remisi 0 · ringan 0<x≤6 · sedang 6<x≤12 · berat x>12.
   it.each([
-    [0, 'Tidak ada aktivitas'],
+    [0, 'Remisi'],
     [1, 'Ringan'],
-    [5, 'Ringan'],
-    [6, 'Sedang'],
-    [10, 'Sedang'],
-    [11, 'Tinggi'],
-    [19, 'Tinggi'],
-    [20, 'Sangat tinggi'],
-    [105, 'Sangat tinggi'],
+    [6, 'Ringan'],
+    [7, 'Sedang'],
+    [12, 'Sedang'],
+    [13, 'Berat'],
+    [105, 'Berat'],
   ])('skor %i → %s', (total, label) => {
     expect(kategoriSledai(total)).toBe(label);
   });

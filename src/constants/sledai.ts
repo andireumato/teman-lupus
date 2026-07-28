@@ -1,17 +1,29 @@
 /**
  * SLEDAI-2K — 24 deskriptor aktivitas penyakit, diisi DOKTER.
  *
- * Bobot di bawah adalah bagian dari instrumennya, bukan pilihan rancangan:
- * mengubahnya berarti bukan SLEDAI-2K lagi. Skor total 0–105.
+ * RUJUKAN
+ * - Gladman DD, Ibañez D, Urowitz MB. Systemic lupus erythematosus disease
+ *   activity index 2000. J Rheumatol 2002;29(2):288–91. PMID 11838846.
+ * - Bombardier C, Gladman DD, Urowitz MB, et al. Derivation of the SLEDAI.
+ *   Arthritis Rheum 1992;35:630–40. PMID 1599520. (asal bobotnya)
+ * - Suszek D, dkk. Reumatologia 2024;62(3):187–95. PMID 39055730 — tinjauan
+ *   akses terbuka yang dipakai memverifikasi struktur & kategori di bawah.
  *
- * ⚠️ WAJIB DIVERIFIKASI reumatolog penanggung jawab sebelum dipakai ke pasien
- * nyata — baik daftar deskriptornya, terjemahannya, maupun bobotnya. Saya
- * menyusunnya dari definisi instrumen yang lazim dipakai, dan salah satu salah
- * ketik pada bobot akan menggeser skor tanpa terlihat.
+ * YANG SUDAH DIVERIFIKASI terhadap rujukan itu (27 Juli 2026):
+ * - 24 deskriptor: 16 klinis + 8 berbasis laboratorium. Daftar di bawah
+ *   memang 16 + 8 (silinder urin, hematuria, proteinuria, piuria, komplemen
+ *   rendah, DNA meningkat, trombositopenia, leukopenia).
+ * - Skor maksimum 105. Ini juga pemeriksaan aritmetika atas bobotnya:
+ *   8×8 + 6×4 + 7×2 + 3×1 = 105 hanya benar bila komposisi bobotnya benar.
+ * - SLEDAI-2K memberi poin pada ruam, alopesia, ulkus mukosa, dan proteinuria
+ *   meski MENETAP — bukan hanya saat baru muncul atau kambuh. Inilah yang
+ *   membedakannya dari SLEDAI asli.
  *
- * Catatan SLEDAI-2K vs SLEDAI asli: pada versi 2K, gejala yang MENETAP
- * (ruam, alopesia, ulkus mukosa, proteinuria) tetap dihitung — bukan hanya
- * yang baru muncul atau kambuh. Ini perbedaan yang menentukan skor.
+ * JENDELA WAKTU: deskriptor dihitung bila ada dalam **30 hari terakhir**,
+ * bukan hanya saat pemeriksaan. Versi pertama layar ini keliru menulis "saat
+ * ini" dan sudah diperbaiki.
+ *
+ * ⚠️ Terjemahan Indonesianya tetap perlu disahkan reumatolog penanggung jawab.
  */
 
 export interface DeskriptorSledai {
@@ -39,7 +51,7 @@ export const SLEDAI_DESKRIPTOR: DeskriptorSledai[] = [
   { key: 'miositis', label: 'Miositis', bobot: 4, kelompok: 'Muskuloskeletal' },
   { key: 'silinder_urin', label: 'Silinder urin', bobot: 4, kelompok: 'Ginjal' },
   { key: 'hematuria', label: 'Hematuria', bobot: 4, kelompok: 'Ginjal' },
-  { key: 'proteinuria', label: 'Proteinuria', bobot: 4, kelompok: 'Ginjal' },
+  { key: 'proteinuria', label: 'Proteinuria > 0,5 g/hari', bobot: 4, kelompok: 'Ginjal' },
   { key: 'piuria', label: 'Piuria', bobot: 4, kelompok: 'Ginjal' },
 
   // ---- Bobot 2 ----
@@ -73,14 +85,27 @@ export const SLEDAI_KELOMPOK = [
 /**
  * Ambang kategori aktivitas penyakit.
  *
- * ⚠️ Berbeda dengan bobot deskriptor, ambang ini TIDAK baku — sumber berbeda
- * memakai potongan berbeda. Wajib dicocokkan dengan rujukan yang dipakai di
- * protokol penelitian sebelum dipakai sebagai luaran formal.
+ * Mengikuti pembagian yang dikutip Suszek dkk. (Reumatologia 2024) dari
+ * Carter EE, Barr SG, Clarke AE. The global burden of SLE. Nat Rev Rheumatol
+ * 2016;12:605–620 (PMID 27558659):
+ *
+ *   remisi   SLEDAI-2K = 0
+ *   ringan   0 < SLEDAI-2K ≤ 6
+ *   sedang   6 < SLEDAI-2K ≤ 12
+ *   berat    SLEDAI-2K > 12
+ *
+ * ⚠️ Versi pertama file ini memakai potongan 1–5 / 6–10 / 11–19 / ≥20 yang
+ * saya susun dari ingatan dan TIDAK cocok dengan rujukan mana pun yang bisa
+ * ditelusuri. Sudah diganti. Berbeda dengan bobot deskriptor, potongan ini
+ * memang bukan bagian instrumen — sumber lain memakai pembagian lain, jadi
+ * tetap cocokkan dengan rujukan yang dipakai protokol penelitian Anda.
+ *
+ * Sebagai pembanding, ambang lain yang lazim dikutip untuk keperluan berbeda:
+ * aktivitas rendah (LDA) SLEDAI-2K < 3, aktivitas tinggi (HDA) > 6.
  */
 export const SLEDAI_KATEGORI: { min: number; label: string }[] = [
-  { min: 20, label: 'Sangat tinggi' },
-  { min: 11, label: 'Tinggi' },
-  { min: 6, label: 'Sedang' },
+  { min: 13, label: 'Berat' },
+  { min: 7, label: 'Sedang' },
   { min: 1, label: 'Ringan' },
-  { min: 0, label: 'Tidak ada aktivitas' },
+  { min: 0, label: 'Remisi' },
 ];

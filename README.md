@@ -476,9 +476,30 @@ mengubahnya berarti bukan SLEDAI-2K lagi — dan dijaga test: 8×bobot 8,
 6×bobot 4, 7×bobot 2, 3×bobot 1, maksimum 105. Kunci yang tidak dikenal
 melempar, bukan diabaikan diam-diam.
 
-> ⚠️ **Wajib diverifikasi reumatolog:** daftar 24 deskriptor beserta
-> terjemahannya, dan terutama **ambang kategori** (Ringan 1–5, Sedang 6–10,
-> Tinggi 11–19, Sangat tinggi ≥20) yang **tidak baku** antar sumber.
+**Diverifikasi ke literatur** 27 Juli 2026 lewat PubMed, dan verifikasi itu
+menemukan dua kesalahan yang sudah diperbaiki:
+
+1. **Jendela waktu.** Layar semula menulis "centang deskriptor yang ada saat
+   ini". Instrumen menghitung deskriptor yang ada dalam **30 hari terakhir**.
+2. **Ambang kategori.** Versi pertama memakai 1–5 / 6–10 / 11–19 / ≥20 yang
+   disusun dari ingatan dan tidak cocok dengan rujukan mana pun yang bisa
+   ditelusuri. Diganti dengan pembagian yang dikutip Suszek dkk. (Reumatologia
+   2024) dari Carter dkk. (Nat Rev Rheumatol 2016): **remisi 0 · ringan ≤6 ·
+   sedang ≤12 · berat >12**.
+
+Yang terverifikasi benar: 24 deskriptor (16 klinis + 8 laboratorium), skor
+maksimum 105 — sekaligus pemeriksaan aritmetika atas komposisi bobotnya — dan
+sifat khas 2K yaitu ruam, alopesia, ulkus mukosa, serta proteinuria tetap
+dihitung meski menetap.
+
+Rujukan tercantum di kepala `constants/sledai.ts`: Gladman dkk. J Rheumatol
+2002 (PMID 11838846), Bombardier dkk. Arthritis Rheum 1992 (PMID 1599520),
+Suszek dkk. Reumatologia 2024 (PMID 39055730), Carter dkk. Nat Rev Rheumatol
+2016 (PMID 27558659).
+
+> ⚠️ Masih perlu disahkan reumatolog: **terjemahan Indonesia** tiap deskriptor,
+> dan apakah potongan kategori Carter cocok dengan protokol penelitian Anda —
+> potongan itu bukan bagian instrumen dan berbeda antar sumber.
 
 ---
 

@@ -66,7 +66,8 @@ export default function SledaiScreen() {
   return (
     <Screen>
       <InfoBar>
-        Centang deskriptor yang ada saat ini. Skor dihitung otomatis dari bobot masing-masing.
+        Centang deskriptor yang ada dalam <Text style={styles.tebal}>30 hari terakhir</Text> — bukan
+        hanya saat pemeriksaan. Skor dihitung otomatis dari bobotnya.
       </InfoBar>
 
       {err && <Msg tone="err">{err}</Msg>}
@@ -122,9 +123,10 @@ export default function SledaiScreen() {
       <PrimaryButton label="Simpan penilaian" onPress={() => void simpan()} loading={busy} />
 
       <Text style={styles.catatan}>
-        Bobot deskriptor adalah bagian dari instrumen SLEDAI-2K. Ambang kategori (Ringan 1–5, Sedang
-        6–10, Tinggi 11–19, Sangat tinggi ≥20) belum baku antar sumber — sesuaikan dengan rujukan
-        yang Anda pakai.
+        Bobot deskriptor bagian dari instrumen SLEDAI-2K (Gladman dkk., J Rheumatol 2002). Ruam,
+        alopesia, ulkus mukosa, dan proteinuria tetap dihitung meski menetap — itu yang membedakan
+        2K dari SLEDAI asli. Kategori remisi 0 · ringan ≤6 · sedang ≤12 · berat &gt;12 mengikuti
+        Carter dkk. 2016; potongan ini bukan bagian instrumen dan berbeda antar sumber.
       </Text>
 
       <Disclaimer>{DISCLAIMER}</Disclaimer>
@@ -179,4 +181,5 @@ const styles = StyleSheet.create({
   bobotText: { fontSize: 12, fontWeight: '700', color: '#6b7280' },
   bobotTextOn: { color: '#fff' },
   catatan: { fontSize: 11.5, color: Brand.teksLembut, lineHeight: 17 },
+  tebal: { fontWeight: '700' },
 });
