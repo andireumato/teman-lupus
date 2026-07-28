@@ -22,6 +22,14 @@ describe('daftar deskriptor', () => {
     expect(hitung(1)).toBe(3);
   });
 
+  it('setiap deskriptor punya definisi bakunya', () => {
+    // Definisi inilah yang menentukan boleh atau tidaknya sebuah deskriptor
+    // dicentang; tanpa itu penilai hanya menebak dari judulnya.
+    for (const d of SLEDAI_DESKRIPTOR) {
+      expect(d.definisi.trim().length).toBeGreaterThan(20);
+    }
+  });
+
   it('skor maksimumnya 105', () => {
     expect(SLEDAI_MAKS).toBe(105);
   });

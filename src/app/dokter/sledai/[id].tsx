@@ -106,12 +106,17 @@ export default function SledaiScreen() {
                     pressed && styles.ditekan,
                   ]}
                 >
-                  <View style={[styles.kotak, on && styles.kotakOn]}>
+                  <View style={[styles.kotak, on && styles.kotakOn, styles.kotakAtas]}>
                     {on && <Ionicons name="checkmark" size={15} color="#fff" />}
                   </View>
-                  <Text style={[styles.label, on && styles.labelOn]}>{d.label}</Text>
-                  <View style={[styles.bobot, on && styles.bobotOn]}>
-                    <Text style={[styles.bobotText, on && styles.bobotTextOn]}>{d.bobot}</Text>
+                  <View style={styles.isi}>
+                    <View style={styles.judulBaris}>
+                      <Text style={[styles.label, on && styles.labelOn]}>{d.label}</Text>
+                      <View style={[styles.bobot, on && styles.bobotOn]}>
+                        <Text style={[styles.bobotText, on && styles.bobotTextOn]}>{d.bobot}</Text>
+                      </View>
+                    </View>
+                    <Text style={styles.definisi}>{d.definisi}</Text>
                   </View>
                 </Pressable>
               );
@@ -146,9 +151,10 @@ const styles = StyleSheet.create({
   skorRincian: { fontSize: 11.5, color: Brand.teksLembut, textAlign: 'center', lineHeight: 17 },
   baris: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: space.sm,
     minHeight: 44,
+    paddingVertical: 10,
     paddingHorizontal: space.md,
     borderWidth: 1,
     borderColor: '#d1d5db',
@@ -168,6 +174,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   kotakOn: { backgroundColor: Brand.ungu, borderColor: Brand.ungu },
+  isi: { flex: 1, gap: 3 },
+  judulBaris: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  kotakAtas: { marginTop: 1 },
+  definisi: { fontSize: 11.5, color: Brand.teksLembut, lineHeight: 16 },
   label: { flex: 1, fontSize: 13.5, fontWeight: '600', color: '#374151' },
   labelOn: { color: Brand.ungu },
   bobot: {

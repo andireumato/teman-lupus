@@ -101,7 +101,7 @@ npm start                 # lalu tekan i (iOS) / a (Android), atau pindai QR den
 
 | Perintah            | Fungsi                                         |
 | ------------------- | ---------------------------------------------- |
-| `npm test`          | Unit test (red-flag, ringkasan, SLEDAI, MARS-5, UV, grafik, kode, tanggal) — 214 test |
+| `npm test`          | Unit test (red-flag, ringkasan, SLEDAI, MARS-5, UV, grafik, kode, tanggal) — 215 test |
 | `npm run typecheck` | Cek tipe TypeScript                            |
 | `npm run lint`      | ESLint + Prettier                              |
 | `npm run format`    | Rapikan format kode                            |
@@ -522,9 +522,19 @@ Rujukan tercantum di kepala `constants/sledai.ts`: Gladman dkk. J Rheumatol
 Suszek dkk. Reumatologia 2024 (PMID 39055730), Carter dkk. Nat Rev Rheumatol
 2016 (PMID 27558659).
 
-> ⚠️ Masih perlu disahkan reumatolog: **terjemahan Indonesia** tiap deskriptor,
-> dan apakah potongan kategori Carter cocok dengan protokol penelitian Anda —
-> potongan itu bukan bagian instrumen dan berbeda antar sumber.
+**Definisi tiap deskriptor** ditampilkan di bawah namanya pada formulir —
+definisi itulah yang menentukan boleh atau tidaknya sesuatu dicentang, dan
+tanpa itu penilai hanya menebak dari judulnya. Dijaga test: tiap deskriptor
+wajib punya definisi.
+
+> ⚠️ Masih perlu disahkan reumatolog:
+> - **Definisi 24 deskriptor** — ini ditulis dari pengetahuan baku SLEDAI
+>   (Bombardier dkk. 1992) dan **belum dicocokkan kata-per-kata** dengan naskah
+>   aslinya; tabel definisinya ada di lampiran yang tidak tersedia sebagai teks
+>   akses terbuka. Berbeda dengan struktur, bobot, dan kategori di atas, yang
+>   memang dicocokkan ke sumber yang bisa dibaca.
+> - **Terjemahan Indonesia** tiap deskriptor.
+> - Apakah potongan kategori Carter cocok dengan protokol penelitian Anda.
 
 ---
 

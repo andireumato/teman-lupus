@@ -33,40 +33,204 @@ export interface DeskriptorSledai {
   bobot: number;
   /** Kelompok organ, hanya untuk pengelompokan tampilan. */
   kelompok: string;
+  /**
+   * Definisi baku deskriptor — yang menentukan boleh atau tidaknya dicentang.
+   *
+   * ⚠️ BELUM DIVERIFIKASI KATA-PER-KATA. Berbeda dengan struktur, bobot, dan
+   * kategori di atas — yang dicocokkan ke sumber yang bisa dibaca — definisi
+   * ini ditulis dari pengetahuan baku SLEDAI (Bombardier dkk. 1992) karena
+   * tabel definisinya ada di lampiran yang tidak tersedia sebagai teks
+   * terbuka. Mohon dicocokkan dengan naskah aslinya sebelum dipakai ke pasien.
+   */
+  definisi: string;
 }
 
 export const SLEDAI_DESKRIPTOR: DeskriptorSledai[] = [
   // ---- Bobot 8 ----
-  { key: 'kejang', label: 'Kejang', bobot: 8, kelompok: 'Saraf' },
-  { key: 'psikosis', label: 'Psikosis', bobot: 8, kelompok: 'Saraf' },
-  { key: 'sindrom_otak_organik', label: 'Sindrom otak organik', bobot: 8, kelompok: 'Saraf' },
-  { key: 'gangguan_penglihatan', label: 'Gangguan penglihatan', bobot: 8, kelompok: 'Saraf' },
-  { key: 'gangguan_saraf_kranial', label: 'Gangguan saraf kranial', bobot: 8, kelompok: 'Saraf' },
-  { key: 'nyeri_kepala_lupus', label: 'Nyeri kepala lupus', bobot: 8, kelompok: 'Saraf' },
-  { key: 'cva', label: 'Cerebrovascular accident (stroke)', bobot: 8, kelompok: 'Saraf' },
-  { key: 'vaskulitis', label: 'Vaskulitis', bobot: 8, kelompok: 'Vaskular' },
+  {
+    key: 'kejang',
+    label: 'Kejang',
+    bobot: 8,
+    kelompok: 'Saraf',
+    definisi: 'Awitan baru. Singkirkan sebab metabolik, infeksi, dan obat.',
+  },
+  {
+    key: 'psikosis',
+    label: 'Psikosis',
+    bobot: 8,
+    kelompok: 'Saraf',
+    definisi:
+      'Gangguan berat kemampuan menjalankan aktivitas normal akibat gangguan persepsi realitas: halusinasi, inkoherensi, asosiasi longgar yang nyata, isi pikir miskin, pikiran sangat tidak logis, atau perilaku aneh/disorganisasi/katatonik. Singkirkan uremia dan sebab obat.',
+  },
+  {
+    key: 'sindrom_otak_organik',
+    label: 'Sindrom otak organik',
+    bobot: 8,
+    kelompok: 'Saraf',
+    definisi:
+      'Gangguan fungsi mental dengan gangguan orientasi, memori, atau fungsi intelektual lain; awitan cepat dan gambaran klinis berfluktuasi; tidak mampu mempertahankan perhatian terhadap lingkungan; ditambah ≥2 dari: gangguan persepsi, bicara inkoheren, insomnia atau mengantuk sepanjang siang, aktivitas psikomotor meningkat atau menurun. Singkirkan sebab metabolik, infeksi, dan obat.',
+  },
+  {
+    key: 'gangguan_penglihatan',
+    label: 'Gangguan penglihatan',
+    bobot: 8,
+    kelompok: 'Saraf',
+    definisi:
+      'Perubahan retina akibat SLE: cytoid bodies, perdarahan retina, eksudat serosa atau perdarahan di koroid, atau neuritis optik. Singkirkan hipertensi, infeksi, dan sebab obat.',
+  },
+  {
+    key: 'gangguan_saraf_kranial',
+    label: 'Gangguan saraf kranial',
+    bobot: 8,
+    kelompok: 'Saraf',
+    definisi: 'Awitan baru neuropati sensorik atau motorik yang melibatkan saraf kranial.',
+  },
+  {
+    key: 'nyeri_kepala_lupus',
+    label: 'Nyeri kepala lupus',
+    bobot: 8,
+    kelompok: 'Saraf',
+    definisi:
+      'Nyeri kepala berat dan menetap; boleh bersifat migrainosa, tetapi harus tidak responsif terhadap analgesik narkotik.',
+  },
+  {
+    key: 'cva',
+    label: 'Cerebrovascular accident (stroke)',
+    bobot: 8,
+    kelompok: 'Saraf',
+    definisi: 'Awitan baru kejadian serebrovaskular. Singkirkan aterosklerosis.',
+  },
+  {
+    key: 'vaskulitis',
+    label: 'Vaskulitis',
+    bobot: 8,
+    kelompok: 'Vaskular',
+    definisi:
+      'Ulserasi, gangren, nodul jari yang nyeri, infark periungual, splinter hemorrhage; atau bukti vaskulitis pada biopsi maupun angiogram.',
+  },
 
   // ---- Bobot 4 ----
-  { key: 'artritis', label: 'Artritis', bobot: 4, kelompok: 'Muskuloskeletal' },
-  { key: 'miositis', label: 'Miositis', bobot: 4, kelompok: 'Muskuloskeletal' },
-  { key: 'silinder_urin', label: 'Silinder urin', bobot: 4, kelompok: 'Ginjal' },
-  { key: 'hematuria', label: 'Hematuria', bobot: 4, kelompok: 'Ginjal' },
-  { key: 'proteinuria', label: 'Proteinuria > 0,5 g/hari', bobot: 4, kelompok: 'Ginjal' },
-  { key: 'piuria', label: 'Piuria', bobot: 4, kelompok: 'Ginjal' },
+  {
+    key: 'artritis',
+    label: 'Artritis',
+    bobot: 4,
+    kelompok: 'Muskuloskeletal',
+    definisi:
+      'Lebih dari 2 sendi dengan nyeri disertai tanda radang: nyeri tekan, bengkak, atau efusi.',
+  },
+  {
+    key: 'miositis',
+    label: 'Miositis',
+    bobot: 4,
+    kelompok: 'Muskuloskeletal',
+    definisi:
+      'Nyeri atau kelemahan otot proksimal, disertai peningkatan kreatin fosfokinase/aldolase, perubahan elektromiogram, atau biopsi yang menunjukkan miositis.',
+  },
+  {
+    key: 'silinder_urin',
+    label: 'Silinder urin',
+    bobot: 4,
+    kelompok: 'Ginjal',
+    definisi: 'Silinder heme-granular atau silinder eritrosit.',
+  },
+  {
+    key: 'hematuria',
+    label: 'Hematuria',
+    bobot: 4,
+    kelompok: 'Ginjal',
+    definisi:
+      'Lebih dari 5 eritrosit per lapang pandang besar. Singkirkan batu, infeksi, dan sebab lain.',
+  },
+  {
+    key: 'proteinuria',
+    label: 'Proteinuria > 0,5 g/hari',
+    bobot: 4,
+    kelompok: 'Ginjal',
+    definisi: 'Lebih dari 0,5 gram per 24 jam.',
+  },
+  {
+    key: 'piuria',
+    label: 'Piuria',
+    bobot: 4,
+    kelompok: 'Ginjal',
+    definisi: 'Lebih dari 5 leukosit per lapang pandang besar. Singkirkan infeksi.',
+  },
 
   // ---- Bobot 2 ----
-  { key: 'ruam', label: 'Ruam', bobot: 2, kelompok: 'Kulit & mukosa' },
-  { key: 'alopesia', label: 'Alopesia', bobot: 2, kelompok: 'Kulit & mukosa' },
-  { key: 'ulkus_mukosa', label: 'Ulkus mukosa', bobot: 2, kelompok: 'Kulit & mukosa' },
-  { key: 'pleuritis', label: 'Pleuritis', bobot: 2, kelompok: 'Serosa' },
-  { key: 'perikarditis', label: 'Perikarditis', bobot: 2, kelompok: 'Serosa' },
-  { key: 'komplemen_rendah', label: 'Komplemen rendah', bobot: 2, kelompok: 'Imunologi' },
-  { key: 'dna_meningkat', label: 'Peningkatan ikatan DNA', bobot: 2, kelompok: 'Imunologi' },
+  {
+    key: 'ruam',
+    label: 'Ruam',
+    bobot: 2,
+    kelompok: 'Kulit & mukosa',
+    definisi: 'Ruam bertipe inflamasi. Pada SLEDAI-2K tetap dihitung meski menetap.',
+  },
+  {
+    key: 'alopesia',
+    label: 'Alopesia',
+    bobot: 2,
+    kelompok: 'Kulit & mukosa',
+    definisi:
+      'Kerontokan rambut abnormal, berbercak maupun difus. Pada SLEDAI-2K tetap dihitung meski menetap.',
+  },
+  {
+    key: 'ulkus_mukosa',
+    label: 'Ulkus mukosa',
+    bobot: 2,
+    kelompok: 'Kulit & mukosa',
+    definisi: 'Ulserasi di mulut atau hidung. Pada SLEDAI-2K tetap dihitung meski menetap.',
+  },
+  {
+    key: 'pleuritis',
+    label: 'Pleuritis',
+    bobot: 2,
+    kelompok: 'Serosa',
+    definisi: 'Nyeri dada pleuritik disertai pleural rub, efusi, atau penebalan pleura.',
+  },
+  {
+    key: 'perikarditis',
+    label: 'Perikarditis',
+    bobot: 2,
+    kelompok: 'Serosa',
+    definisi:
+      'Nyeri perikardial disertai ≥1 dari: rub, efusi, atau konfirmasi elektrokardiogram maupun ekokardiogram.',
+  },
+  {
+    key: 'komplemen_rendah',
+    label: 'Komplemen rendah',
+    bobot: 2,
+    kelompok: 'Imunologi',
+    definisi: 'Penurunan CH50, C3, atau C4 di bawah batas bawah normal laboratorium pemeriksa.',
+  },
+  {
+    key: 'dna_meningkat',
+    label: 'Peningkatan ikatan DNA',
+    bobot: 2,
+    kelompok: 'Imunologi',
+    definisi: 'Ikatan >25% pada Farr assay, atau di atas rentang normal laboratorium pemeriksa.',
+  },
 
   // ---- Bobot 1 ----
-  { key: 'demam', label: 'Demam', bobot: 1, kelompok: 'Konstitusional' },
-  { key: 'trombositopenia', label: 'Trombositopenia', bobot: 1, kelompok: 'Hematologi' },
-  { key: 'leukopenia', label: 'Leukopenia', bobot: 1, kelompok: 'Hematologi' },
+  {
+    key: 'demam',
+    label: 'Demam',
+    bobot: 1,
+    kelompok: 'Konstitusional',
+    definisi: 'Suhu di atas 38 °C. Singkirkan sebab infeksi.',
+  },
+  {
+    key: 'trombositopenia',
+    label: 'Trombositopenia',
+    bobot: 1,
+    kelompok: 'Hematologi',
+    definisi: 'Trombosit kurang dari 100.000/mm³.',
+  },
+  {
+    key: 'leukopenia',
+    label: 'Leukopenia',
+    bobot: 1,
+    kelompok: 'Hematologi',
+    definisi: 'Leukosit kurang dari 3.000/mm³. Singkirkan sebab obat.',
+  },
 ];
 
 /** Urutan kelompok saat ditampilkan; deskriptor berbobot besar lebih dulu. */
