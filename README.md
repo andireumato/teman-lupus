@@ -45,6 +45,13 @@ dibuat** 27 Juli 2026 lewat Dashboard SQL Editor, dengan isi
 Diverifikasi lewat REST: keduanya terbaca (HTTP 200) dan RLS aktif — insert
 tanpa login ditolak `42501`.
 
+Peringatan otomatis (`alerts.flare_check_id`, trigger `on_flare_check_alert`,
+plus pengisian awal untuk Cek Flare kuning/merah yang sudah telanjur ada)
+**sudah dipasang** 29 Juli 2026 dengan isi `supabase/alerts_kunjungan.sql`.
+Diverifikasi lewat REST: kolomnya terbaca (HTTP 200) dan RLS `alerts` aktif —
+insert tanpa login ditolak `42501`. Jumlah barisnya sendiri tidak bisa dicek
+dari luar justru karena RLS menyembunyikannya dari pengguna anonim.
+
 Skema obat diperbarui 27 Juli 2026 lewat Dashboard SQL Editor dengan isi
 `supabase/obat_frekuensi_dan_riwayat.sql`: kolom `medications.frekuensi` dan
 tabel `medication_events`. Diverifikasi lewat REST: keduanya terbaca (HTTP 200)
