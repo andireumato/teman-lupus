@@ -166,6 +166,46 @@ supabase/                 SQL pelengkap yang belum ada di skema awal
 
 ---
 
+## Logo & ikon
+
+Sumbernya satu berkas: logo lingkaran berisi kupu-kupu, nama, dan tagline
+(`~/Downloads/teman-lupus-logo.png`, 512×512). Seluruh aset diturunkan darinya
+oleh skrip sekali-jalan memakai `jimp-compact` yang sudah ada di dependensi.
+
+Dua keputusan yang menentukan hasilnya:
+
+**Ikon aplikasi hanya memakai kupu-kupunya, tanpa tulisan.** Ikon di layar HP
+tampil sekitar 60×60 titik; pada ukuran itu nama dan tagline jadi bubur dan
+hanya menambah keruwetan. Logo utuh dipakai di layar masuk, tempat ukurannya
+besar dan terbaca.
+
+**Latar kupu-kupu dibuat transparan, bukan dipotong sebagai persegi.**
+Menempelkan potongan persegi ke kanvas berwarna meninggalkan garis kotak samar,
+karena latar sumbernya tidak rata (artefak JPEG). Batas kupu-kupunya juga
+dipindai otomatis dengan mengabaikan piksel berjarak >195 px dari pusat, supaya
+cincin ungu di tepi logo tidak ikut terhitung.
+
+Aset yang dihasilkan:
+
+| Berkas | Isi |
+| --- | --- |
+| `icon.png` | Kupu-kupu di kanvas 1024 buram penuh — iOS menolak ikon ber-alpha |
+| `android-icon-foreground.png` | Kupu-kupu transparan, hanya 52% lebar kanvas (zona aman Android ~66%) |
+| `android-icon-background.png` | Warna rata `#FAFAF6`, dicuplik dari latar logo |
+| `android-icon-monochrome.png` | Siluet hitam untuk ikon bertema Android |
+| `logo-teman-lupus.png` | Logo utuh, di luar lingkaran dibuat transparan |
+| `splash-icon.png`, `favicon.png` | Turunan yang sama |
+
+> Sumbernya hanya 512×512 dan kupu-kupunya sekitar 285 px, jadi ikon 1024 px
+> hasil pembesaran **agak lunak**. Kalau ada berkas asli beresolusi lebih
+> tinggi, jalankan ulang skripnya dengan berkas itu.
+
+> Ikon aplikasi bagian **native** — ia tidak ikut hot reload. Perubahannya baru
+> terlihat setelah APK/IPA dibangun ulang. Yang langsung terlihat hanya logo di
+> layar masuk.
+
+---
+
 ## Beranda
 
 Mengikuti `docs/prototipe-web-2026-07-16.html`:

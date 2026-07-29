@@ -1,4 +1,4 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
+import { Image } from 'expo-image';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, Text, View } from 'react-native';
 
@@ -74,9 +74,16 @@ export default function LoginScreen() {
     >
       <Screen style={styles.content}>
         <View style={styles.header}>
-          <Ionicons name="heart-circle" size={56} color={Brand.ungu} />
-          <Text style={styles.title}>Teman Lupus</Text>
-          <Text style={styles.subtitle}>Pendamping harian pasien lupus</Text>
+          {/*
+            Logo memuat nama & tagline-nya sendiri, jadi judul teks di bawahnya
+            dibuang — kalau tidak, "Teman Lupus" tertulis dua kali bertumpuk.
+          */}
+          <Image
+            source={require('@/assets/images/logo-teman-lupus.png')}
+            style={styles.logo}
+            contentFit="contain"
+            accessibilityLabel="Teman Lupus — pantau, pahami, perjalananmu, bersama"
+          />
         </View>
 
         <Card>
@@ -150,9 +157,8 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   content: { justifyContent: 'center', flexGrow: 1 },
+  logo: { width: 190, height: 190 },
   header: { alignItems: 'center', gap: space.xs, marginBottom: space.sm },
-  title: { fontSize: 26, fontWeight: '800', color: Brand.ungu },
-  subtitle: { fontSize: 13.5, color: Brand.teksLembut },
   modeHint: { fontSize: 12.5, color: Brand.teksLembut, textAlign: 'center' },
   fieldLabel: { fontSize: 13, fontWeight: '600', color: '#374151' },
 });
