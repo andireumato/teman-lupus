@@ -15,8 +15,15 @@
  * lewat distribusi internal — sebelum kirim ke Play, ini WAJIB terisi.
  */
 
-/** Alamat dasar situs, mis. `https://namaanda.github.io/teman-lupus/`. */
-export const URL_SITUS = '';
+/**
+ * Alamat dasar situs.
+ *
+ * Dipasang 31 Juli 2026 di GitHub Pages dari `docs/` pada branch `main` repo
+ * `andireumato/teman-lupus`. Mengubah nama repo atau memindahkan foldernya akan
+ * memutus alamat ini — dan Play menolak aplikasi yang tautan kebijakan
+ * privasinya mati.
+ */
+export const URL_SITUS = 'https://andireumato.github.io/teman-lupus/';
 
 /**
  * Menyambung alamat dasar dengan nama berkas.

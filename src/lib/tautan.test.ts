@@ -7,13 +7,28 @@ import {
 } from '@/constants/tautan';
 
 describe('tautan situs', () => {
-  it('BELUM dipasang — halaman web pendamping belum di-hosting', () => {
-    // Test ini gagal begitu URL_SITUS diisi, dan itu memang tandanya: ubah
-    // harapannya jadi `true` bersamaan dengan memasang situsnya, lalu daftarkan
-    // URL yang sama di Play Console.
-    expect(situsTerpasang()).toBe(false);
-    expect(urlPrivasi()).toBe('');
-    expect(urlHapusAkun()).toBe('');
+  it('sudah dipasang — halaman web pendamping hidup di GitHub Pages', () => {
+    expect(situsTerpasang()).toBe(true);
+  });
+
+  it('kedua alamatnya utuh dan berbeda', () => {
+    // Diverifikasi HTTP 200 pada 31 Juli 2026. Kalau salah satu berubah jadi
+    // sama, satu di antaranya salah ketik.
+    expect(urlPrivasi()).toBe('https://andireumato.github.io/teman-lupus/');
+    expect(urlHapusAkun()).toBe('https://andireumato.github.io/teman-lupus/hapus-akun.html');
+    expect(urlPrivasi()).not.toBe(urlHapusAkun());
+  });
+
+  it('memakai https, bukan http', () => {
+    // Kebijakan privasi yang disajikan tanpa TLS akan ditolak peninjau Play.
+    for (const u of [urlPrivasi(), urlHapusAkun()]) expect(u.startsWith('https://')).toBe(true);
+  });
+
+  it('tidak ada garis miring ganda di tengah alamat', () => {
+    // Cacat penyambungan yang paling sering lolos mata: `.../teman-lupus//hapus-akun.html`.
+    for (const u of [urlPrivasi(), urlHapusAkun()]) {
+      expect(u.slice('https://'.length)).not.toContain('//');
+    }
   });
 
   it('konstanta dasarnya string, bukan undefined', () => {
