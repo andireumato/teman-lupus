@@ -1,0 +1,24 @@
+flowchart TD
+    A["Aktivitas penyakit LES<br/>berfluktuasi harian"]
+    B["Penilaian klinis hanya<br/>pada kunjungan berkala"]
+    C["Kesenjangan informasi<br/>antarkunjungan"]
+    D["Bias mengingat kembali"]
+    E["Ketidakpatuhan minum obat<br/>tidak terdeteksi"]
+    F["Pemantauan mandiri harian<br/>berpotensi memperkecil kesenjangan"]
+    G["Syarat: pasien bersedia dan mampu<br/>memakai secara berkelanjutan"]
+    H["Kelayakan dan penerimaan<br/>TITIK MASUK PENELITIAN INI"]
+
+    A --> C
+    B --> C
+    D --> C
+    E --> C
+    C --> F
+    F --> G
+    G --> H
+
+    classDef masalah fill:#fdecea,stroke:#c0392b,stroke-width:1px,color:#111
+    classDef antara fill:#fff6e5,stroke:#d68910,stroke-width:1px,color:#111
+    classDef fokus fill:#eae6fb,stroke:#5b3cc4,stroke-width:2px,color:#111
+    class A,B,D,E masalah
+    class C,F,G antara
+    class H fokus

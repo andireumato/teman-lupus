@@ -5,6 +5,7 @@ import type {
   DailyCheckin,
   FlareCheck,
   LupusQolAssessment,
+  MedicationEvent,
   Patient,
   SledaiAssessment,
 } from '@/types/database';
@@ -67,6 +68,7 @@ function data(d: Partial<DataEkspor> = {}): DataEkspor {
     checkins: [],
     meds: [],
     medLogs: [],
+    medEvents: [],
     efekSamping: [],
     alerts: [],
     tindakLanjut: [],
@@ -282,6 +284,7 @@ describe('berkas & urutan', () => {
       'gejala.csv',
       'obat.csv',
       'dosis.csv',
+      'obat_riwayat.csv',
       'efek_samping.csv',
       'mars.csv',
       'cek_flare.csv',
@@ -690,5 +693,68 @@ describe('gerbang izin penelitian', () => {
     expect(k).toContain('dasar_penyertaan');
     expect(k).toContain('consent_penelitian');
     expect(k).toContain('jumlah_pasien,1');
+  });
+});
+
+describe('obat_riwayat.csv', () => {
+  const ev = (p: Partial<MedicationEvent> = {}): MedicationEvent => ({
+    id: `e-${++seq}`,
+    patient_id: P1,
+    medication_id: 'm1',
+    jenis: 'mulai',
+    tanggal: '2026-07-01',
+    catatan: null,
+    created_at: '2026-07-01T08:00:00+07:00',
+    ...p,
+  });
+
+  it('memuat rentang aktif obat — penyebut dosis terjadwal', () => {
+    // Tanpa berkas ini, dosis TERJADWAL tidak bisa dihitung: obat.csv hanya
+    // menyimpan `aktif` keadaan sekarang, bukan kapan mulai dan berhentinya.
+    const b = ambil(
+      rakitEkspor(
+        data({
+          medEvents: [
+            ev({ jenis: 'mulai', tanggal: '2026-07-01' }),
+            ev({ jenis: 'stop', tanggal: '2026-07-20' }),
+          ],
+        })
+      ),
+      'obat_riwayat.csv'
+    );
+    expect(baris(b)[0]).toBe('kode,obat_kode,nama_obat,jenis,tanggal');
+    expect(b.baris).toBe(2);
+    expect(b.isi).toContain('mulai,2026-07-01');
+    expect(b.isi).toContain('stop,2026-07-20');
+  });
+
+  it('catatan bebas TIDAK ikut', () => {
+    // Aturan yang sama dengan seluruh teks bebas lain di ekspor ini.
+    const berkas = rakitEkspor(
+      data({ medEvents: [ev({ catatan: 'RAHASIA pasien menolak minum' })] })
+    );
+    for (const b of berkas) expect(b.isi).not.toContain('RAHASIA');
+  });
+
+  it('ikut tersaring gerbang izin penelitian', () => {
+    const b = ambil(
+      rakitEkspor(
+        data({
+          izinPenelitian: [P1],
+          medEvents: [ev({ patient_id: P1 }), ev({ patient_id: P2 })],
+        })
+      ),
+      'obat_riwayat.csv'
+    );
+    expect(b.baris).toBe(1);
+    expect(b.isi).not.toContain('aaaabbbb');
+  });
+
+  it('keterangan.csv menjelaskan penyebut kepatuhan', () => {
+    // Perbedaan "dosis tercatat" dan "dosis terjadwal" adalah hal pertama yang
+    // salah dipahami saat menganalisis kepatuhan.
+    const k = ambil(rakitEkspor(data()), 'keterangan.csv').isi;
+    expect(k).toContain('penyebut_kepatuhan');
+    expect(k).toContain('hanya ada bila pasien mencatat');
   });
 });

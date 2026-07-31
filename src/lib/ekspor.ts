@@ -44,6 +44,7 @@ import type {
   FlareCheck,
   LabResult,
   MarsAssessment,
+  MedicationEvent,
   MedLog,
   Medication,
   MedSideEffect,
@@ -58,6 +59,14 @@ export interface DataEkspor {
   checkins: DailyCheckin[];
   meds: Medication[];
   medLogs: MedLog[];
+  /**
+   * Riwayat mulai/berhenti/lanjut obat.
+   *
+   * Diperlukan untuk menghitung DOSIS TERJADWAL: `medications.aktif` hanya
+   * menyimpan keadaan sekarang, sehingga obat yang dimulai atau dihentikan di
+   * tengah periode tidak dapat dihitung tanpa riwayat ini.
+   */
+  medEvents: MedicationEvent[];
   efekSamping: MedSideEffect[];
   mars: MarsAssessment[];
   flares: FlareCheck[];
@@ -108,6 +117,7 @@ function saringIzin(d: DataEkspor): DataEkspor {
     checkins: p(d.checkins),
     meds: p(d.meds),
     medLogs: p(d.medLogs),
+    medEvents: p(d.medEvents),
     efekSamping: p(d.efekSamping),
     mars: p(d.mars),
     flares: p(d.flares),
@@ -260,6 +270,20 @@ export function rakitEkspor(semua: DataEkspor): BerkasCsv[] {
         { judul: 'diminum', ambil: (l) => l.diminum },
       ],
       urut(d.medLogs, (l) => [kode(l.patient_id), l.tanggal, String(l.slot ?? 0)])
+    ),
+
+    tabel<MedicationEvent>(
+      'obat_riwayat.csv',
+      [
+        { judul: 'kode', ambil: (e) => kode(e.patient_id) },
+        { judul: 'obat_kode', ambil: (e) => obatKode(e.medication_id) },
+        { judul: 'nama_obat', ambil: (e) => namaObat.get(e.medication_id) ?? null },
+        // 'mulai' | 'stop' | 'lanjut'
+        { judul: 'jenis', ambil: (e) => e.jenis },
+        { judul: 'tanggal', ambil: (e) => e.tanggal },
+        // `catatan` sengaja TIDAK ikut — teks bebas, lihat catatan privasi di kepala.
+      ],
+      urut(d.medEvents, (e) => [kode(e.patient_id), e.tanggal, e.jenis])
     ),
 
     tabel<MedSideEffect>(
@@ -491,6 +515,11 @@ function keterangan(d: DataEkspor): BerkasCsv {
     {
       kunci: 'jam_ke_tindak_lanjut',
       nilai: 'diukur dari terbitnya peringatan, bukan dari waktu cek flare',
+    },
+    {
+      kunci: 'penyebut_kepatuhan',
+      nilai:
+        'baris dosis.csv hanya ada bila pasien mencatat; dosis terjadwal dihitung dari obat.csv (frekuensi) + obat_riwayat.csv (rentang aktif)',
     },
     {
       kunci: 'lupusqol',

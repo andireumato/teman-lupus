@@ -1,0 +1,31 @@
+---
+config:
+  flowchart:
+    rankSpacing: 32
+    nodeSpacing: 28
+---
+flowchart TD
+    Z["Peserta terdaftar"]
+    F["Penilaian awal T0"]
+    G["Pemantauan bulan pertama sampai ketiga"]
+    H{"Masih aktif pada bulan ketiga?"}
+    Hx["Wawancara hambatan penggunaan"]
+    I["Penilaian akhir T3"]
+    J["Ekspor tanpa identitas"]
+    K["Analisis univariat dan bivariat"]
+
+    Z --> F
+    F --> G
+    G --> H
+    H -- Tidak --> Hx
+    H -- Ya --> I
+    Hx --> J
+    I --> J
+    J --> K
+
+    classDef tanya fill:#fff6e5,stroke:#d68910,stroke-width:1px,color:#111
+    classDef proses fill:#e8f1fb,stroke:#2471a3,stroke-width:1px,color:#111
+    classDef hasil fill:#e6f4ea,stroke:#1e8449,stroke-width:2px,color:#111
+    class H tanya
+    class Z,F,G,I,Hx proses
+    class J,K hasil

@@ -1,0 +1,37 @@
+---
+config:
+  flowchart:
+    rankSpacing: 32
+    nodeSpacing: 28
+---
+flowchart TD
+    A["Pasien LES rawat jalan"]
+    B{"Memenuhi kriteria?"}
+    Bx["Tidak disertakan"]
+    C["Penjelasan lisan dan tertulis"]
+    D{"Persetujuan pemakaian<br/>WAJIB"}
+    Dx["Tidak ikut serta"]
+    E{"Persetujuan penelitian<br/>OPSIONAL"}
+    E1["Data ikut analisis"]
+    E2["Data tidak ikut analisis"]
+    Z["Peserta terdaftar"]
+
+    A --> B
+    B -- Tidak --> Bx
+    B -- Ya --> C
+    C --> D
+    D -- Tidak --> Dx
+    D -- Ya --> E
+    E -- Ya --> E1
+    E -- Tidak --> E2
+    E1 --> Z
+    E2 --> Z
+
+    classDef keluar fill:#fdecea,stroke:#c0392b,stroke-width:1px,color:#111
+    classDef tanya fill:#fff6e5,stroke:#d68910,stroke-width:1px,color:#111
+    classDef proses fill:#e8f1fb,stroke:#2471a3,stroke-width:1px,color:#111
+    classDef hasil fill:#e6f4ea,stroke:#1e8449,stroke-width:2px,color:#111
+    class Bx,Dx keluar
+    class B,D,E tanya
+    class A,C,E1,E2 proses
+    class Z hasil

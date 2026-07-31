@@ -30,6 +30,7 @@ import type {
   FlareCheck,
   LabResult,
   MarsAssessment,
+  MedicationEvent,
   MedLog,
   Medication,
   MedSideEffect,
@@ -64,6 +65,7 @@ type TabelPasien =
   | 'medications'
   | 'med_logs'
   | 'med_side_effects'
+  | 'medication_events'
   | 'mars_assessments'
   | 'flare_checks'
   | 'lab_results'
@@ -155,7 +157,7 @@ export default function EksporScreen() {
       // saat ekspor dijalankan pengguna.
       const ambil = (tabel: TabelPasien) => supabase.from(tabel).select('*').in('patient_id', ids);
 
-      const [sl, ci, me, ml, es, ma, fl, lb, vs, al, lq] = await Promise.all([
+      const [sl, ci, me, ml, es, ma, fl, lb, vs, al, lq, mev] = await Promise.all([
         ambil('sledai_assessments'),
         ambil('daily_checkins'),
         ambil('medications'),
@@ -167,6 +169,7 @@ export default function EksporScreen() {
         ambil('visits'),
         ambil('alerts'),
         ambil('lupusqol_assessments'),
+        ambil('medication_events'),
       ]);
 
       // Tindak lanjut menyusul, bukan sejajar: ia dikunci `alert_id`, bukan
@@ -223,6 +226,7 @@ export default function EksporScreen() {
         checkins: (ci.data ?? []) as DailyCheckin[],
         meds: (me.data ?? []) as Medication[],
         medLogs: (ml.data ?? []) as MedLog[],
+        medEvents: (mev.data ?? []) as MedicationEvent[],
         efekSamping: (es.data ?? []) as MedSideEffect[],
         mars: (ma.data ?? []) as MarsAssessment[],
         flares: (fl.data ?? []) as FlareCheck[],
