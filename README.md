@@ -186,6 +186,7 @@ Bila suatu saat perlu menyiapkan project Supabase dari nol:
    - `supabase/kunci_fungsi_dari_anon.sql`
    - `supabase/lupusqol.sql`
    - `supabase/hapus_akun.sql`
+   - `supabase/consent_penelitian.sql`
    - `supabase/target_doris_lldas.sql`
 3. Salin Project URL & anon key ke `.env`.
 
@@ -201,7 +202,7 @@ npm start                 # lalu tekan i (iOS) / a (Android), atau pindai QR den
 
 | Perintah            | Fungsi                                         |
 | ------------------- | ---------------------------------------------- |
-| `npm test`          | Unit test (red-flag, ringkasan, SLEDAI, MARS-5, UV, grafik, kode, tanggal, klinis, pengingat, target, csv, ekspor, base64, tindak lanjut, LupusQoL, hapus akun, tautan) — 462 test |
+| `npm test`          | Unit test (red-flag, ringkasan, SLEDAI, MARS-5, UV, grafik, kode, tanggal, klinis, pengingat, target, csv, ekspor, base64, tindak lanjut, LupusQoL, hapus akun, tautan) — 472 test |
 | `npm run typecheck` | Cek tipe TypeScript                            |
 | `npm run lint`      | ESLint + Prettier                              |
 | `npm run format`    | Rapikan format kode                            |
@@ -1042,6 +1043,62 @@ Diperiksa langsung di kode, bukan diasumsikan:
   token, tidak ada server notifikasi
 - Hanya dua pihak ketiga: Supabase (penyimpanan, region Singapura
   `ap-southeast-1`) dan Open-Meteo (koordinat saja)
+
+---
+
+## Persetujuan: pemakaian vs penelitian
+
+Semula keduanya satu centang, sehingga pasien yang menolak penelitian tidak bisa
+memakai aplikasi untuk perawatannya sendiri. Keikutsertaan seperti itu tidak
+benar-benar sukarela — dan itu justru syarat yang paling dijaga komite etik.
+
+| Kolom | Arti |
+|---|---|
+| `profiles.consent_at` / `consent_version` | Persetujuan **pemakaian** — wajib |
+| `profiles.consent_penelitian` | Persetujuan **penelitian** — opsional |
+| `profiles.consent_penelitian_at` | Kapan jawabannya diberikan atau diubah |
+
+`consent_penelitian` sengaja **boolean nullable**, bukan `not null default
+false`: NULL berarti belum ditanya, `false` berarti menolak. Menyamakan keduanya
+membuat pasien yang belum sempat ditanya terhitung sebagai penolak dalam laporan
+kepatuhan etik. Baris lama tidak diisi apa pun — `CONSENT_VERSION` dinaikkan
+sehingga semua pasien melewati layar persetujuan baru dan menjawab sendiri.
+
+`consentValid` menuntut ketiganya: `consent_at` ada, versinya cocok, DAN
+`consent_penelitian` bukan NULL. Menolak sudah cukup — menolak adalah jawaban.
+
+### Gerbang izin di ekspor
+
+`rakitEkspor()` memanggil `saringIzin()` sebagai baris pertamanya. Satu gerbang
+di pintu masuk, bukan penyaringan per tabel:
+
+```ts
+export function rakitEkspor(semua: DataEkspor): BerkasCsv[] {
+  const d = saringIzin(semua);   // segalanya di bawah ini hanya melihat yang menyetujui
+```
+
+Menyaring dua belas tabel satu per satu berarti dua belas kesempatan untuk lupa,
+dan yang terlupa adalah data kesehatan orang yang menyatakan tidak mau ikut.
+Tabel baru otomatis ikut tersaring asal punya `patient_id`.
+
+`alert_tindak_lanjut` tidak punya `patient_id`, jadi ia disaring lewat peringatan
+yang sudah lolos — ada test khusus untuk itu.
+
+### Yang dijaga test
+
+**Pasien yang menolak tidak muncul di satu berkas pun.** Diperiksa menyeluruh ke
+seluruh berkas, bukan hanya `pasien.csv` — menyaring satu tabel tapi lupa yang
+lain adalah kebocoran yang tidak menimbulkan galat apa pun.
+
+**Daftar izin kosong menghasilkan ekspor kosong, bukan ekspor penuh.** Gerbang
+yang salah arah membalik "tidak ada yang mengizinkan" jadi "semua boleh" — itu
+kegagalan paling berbahaya yang mungkin terjadi di berkas ini.
+
+**Semua berkas tetap ada meski nol baris.** Berkas yang hilang tidak bisa
+dibedakan dari ekspor yang gagal separuh.
+
+**Kotak penelitian tidak dicentang di awal.** Kotak yang sudah tercentang bukan
+persetujuan, itu kelalaian yang dibiarkan.
 
 ---
 

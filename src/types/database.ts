@@ -18,9 +18,19 @@ export type Profile = {
    * pasien. Lihat supabase/sisi_dokter.sql.
    */
   kode_dokter: string | null;
-  /** NULL = pasien belum menyetujui informed consent. */
+  /** Persetujuan PENGGUNAAN. NULL = belum menyetujui; wajib untuk memakai aplikasi. */
   consent_at: string | null;
   consent_version: string | null;
+  /**
+   * Persetujuan PENELITIAN — terpisah dan opsional.
+   *
+   * NULL = belum menjawab, true = ikut, false = menolak. Menolak TIDAK
+   * membatasi pemakaian aplikasi. Perlakukan NULL sama seperti false saat
+   * memutuskan apakah data boleh ikut ekspor penelitian — belum menjawab
+   * bukan izin. Lihat supabase/consent_penelitian.sql.
+   */
+  consent_penelitian: boolean | null;
+  consent_penelitian_at: string | null;
   created_at: string;
 };
 

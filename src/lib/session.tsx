@@ -26,7 +26,23 @@ interface SessionValue {
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, nama: string, role: Role) => Promise<void>;
   signOut: () => Promise<void>;
-  agreeConsent: () => Promise<void>;
+  /**
+   * Menyimpan persetujuan PENGGUNAAN (wajib) beserta jawaban PENELITIAN
+   * (opsional) sekaligus, dalam satu tulisan.
+   *
+   * Satu tulisan, bukan dua: kegagalan jaringan di antara keduanya akan
+   * meninggalkan pasien yang sudah menyetujui penggunaan tetapi jawaban
+   * penelitiannya kosong — dan kosong itu tidak bisa dibedakan dari "belum
+   * ditanya", sehingga ia akan ditanyai lagi tanpa sebab.
+   */
+  agreeConsent: (ikutPenelitian: boolean) => Promise<void>;
+  /**
+   * Mengubah HANYA jawaban penelitian, dari layar Profil.
+   *
+   * Tidak menyentuh `consent_at`: mencabut keikutsertaan penelitian tidak
+   * boleh berakibat pasien diminta menyetujui ulang pemakaian aplikasinya.
+   */
+  ubahConsentPenelitian: (ikut: boolean) => Promise<void>;
   reload: () => Promise<void>;
 }
 
@@ -146,23 +162,53 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
   }, []);
 
-  const agreeConsent = useCallback(async () => {
-    const userId = session?.user.id;
-    if (!userId) throw new Error('Sesi login tidak ditemukan.');
-    const { error } = await supabase
-      .from('profiles')
-      .update({ consent_at: new Date().toISOString(), consent_version: CONSENT_VERSION })
-      .eq('id', userId);
-    if (error) throw error;
-    await loadProfile(userId);
-  }, [session?.user.id, loadProfile]);
+  const agreeConsent = useCallback(
+    async (ikutPenelitian: boolean) => {
+      const userId = session?.user.id;
+      if (!userId) throw new Error('Sesi login tidak ditemukan.');
+      const sekarang = new Date().toISOString();
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          consent_at: sekarang,
+          consent_version: CONSENT_VERSION,
+          consent_penelitian: ikutPenelitian,
+          consent_penelitian_at: sekarang,
+        })
+        .eq('id', userId);
+      if (error) throw error;
+      await loadProfile(userId);
+    },
+    [session?.user.id, loadProfile]
+  );
+
+  const ubahConsentPenelitian = useCallback(
+    async (ikut: boolean) => {
+      const userId = session?.user.id;
+      if (!userId) throw new Error('Sesi login tidak ditemukan.');
+      const { error } = await supabase
+        .from('profiles')
+        .update({ consent_penelitian: ikut, consent_penelitian_at: new Date().toISOString() })
+        .eq('id', userId);
+      if (error) throw error;
+      await loadProfile(userId);
+    },
+    [session?.user.id, loadProfile]
+  );
 
   const reload = useCallback(async () => {
     await loadProfile(session?.user.id);
   }, [session?.user.id, loadProfile]);
 
   // Consent lama tidak berlaku lagi ketika naskahnya diperbarui.
-  const consentValid = profile?.consent_at != null && profile.consent_version === CONSENT_VERSION;
+  //
+  // Jawaban penelitian yang masih NULL juga membuat consent belum lengkap:
+  // artinya pasien belum pernah melewati layar persetujuan versi ini, jadi ia
+  // belum pernah ditanya. `false` sudah cukup — menolak adalah jawaban.
+  const consentValid =
+    profile?.consent_at != null &&
+    profile.consent_version === CONSENT_VERSION &&
+    profile.consent_penelitian != null;
 
   const value = useMemo<SessionValue>(
     () => ({
@@ -175,6 +221,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       signUp,
       signOut,
       agreeConsent,
+      ubahConsentPenelitian,
       reload,
     }),
     [
@@ -187,6 +234,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       signUp,
       signOut,
       agreeConsent,
+      ubahConsentPenelitian,
       reload,
     ]
   );

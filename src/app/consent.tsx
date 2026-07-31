@@ -35,6 +35,10 @@ export default function ConsentScreen() {
   const { agreeConsent, signOut, profile } = useSession();
   const [baca, setBaca] = useState(false);
   const [setuju, setSetuju] = useState(false);
+  // Sengaja TIDAK dicentang di awal. Persetujuan penelitian harus tindakan
+  // aktif; kotak yang sudah tercentang bukan persetujuan, itu kelalaian yang
+  // dibiarkan.
+  const [penelitian, setPenelitian] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -46,7 +50,7 @@ export default function ConsentScreen() {
     setErr(null);
     setBusy(true);
     try {
-      await agreeConsent();
+      await agreeConsent(penelitian);
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Gagal menyimpan persetujuan.');
     } finally {
@@ -98,13 +102,28 @@ export default function ConsentScreen() {
       </Card>
 
       <Card>
+        <Text style={styles.bagian}>Wajib</Text>
         <Checkbox checked={baca} onToggle={() => setBaca((v) => !v)}>
           Saya telah membaca dan memahami penjelasan di atas.
         </Checkbox>
         <Checkbox checked={setuju} onToggle={() => setSetuju((v) => !v)}>
-          Saya setuju ikut serta secara sukarela dan data saya digunakan untuk perawatan &
-          penelitian.
+          Saya setuju memakai aplikasi ini, dan data saya disimpan untuk mendukung perawatan saya
+          bersama dokter.
         </Checkbox>
+
+        <View style={styles.pemisah} />
+
+        <Text style={styles.bagian}>Pilihan — boleh tidak dicentang</Text>
+        <Checkbox checked={penelitian} onToggle={() => setPenelitian((v) => !v)}>
+          Saya bersedia data saya ikut dianalisis untuk penelitian, tanpa nama dan tanpa tanggal
+          lahir.
+        </Checkbox>
+        <Text style={styles.ketPenelitian}>
+          Bagian ini sepenuhnya pilihan Anda. Menolaknya{' '}
+          <Text style={styles.tegas}>tidak mengurangi apa pun</Text> — seluruh fitur aplikasi tetap
+          bisa dipakai, dan pelayanan medis Anda tidak terpengaruh. Anda juga boleh mengubah jawaban
+          ini kapan saja lewat layar Profil.
+        </Text>
 
         {err && <Msg tone="err">{err}</Msg>}
 
@@ -130,6 +149,15 @@ const styles = StyleSheet.create({
   pemisah: { height: 1, backgroundColor: Brand.garis, marginVertical: space.xs },
   meta: { fontSize: 12.5, color: '#374151', lineHeight: 18 },
   versi: { fontSize: 11.5, color: Brand.teksLembut, marginTop: space.xs },
+  bagian: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: Brand.teksLembut,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  ketPenelitian: { fontSize: 11.5, color: Brand.teksLembut, lineHeight: 17, paddingLeft: 30 },
+  tegas: { fontWeight: '700', color: Brand.teks },
   checkRow: { flexDirection: 'row', gap: space.sm, alignItems: 'flex-start', paddingVertical: 6 },
   box: {
     width: 22,

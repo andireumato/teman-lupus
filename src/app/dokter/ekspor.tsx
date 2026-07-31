@@ -34,6 +34,7 @@ import type {
   Medication,
   MedSideEffect,
   Patient,
+  Profile,
   SledaiAssessment,
   Visit,
 } from '@/types/database';
@@ -48,6 +49,13 @@ import type {
  * Dikemas jadi SATU zip. Share sheet hanya menerima satu berkas, dan dua belas
  * kali berbagi berturut-turut bukan alat yang bisa dipakai.
  */
+
+/** Kolom persetujuan penelitian belum tentu ada di project Supabase lama. */
+function pesanConsent(raw: string): string {
+  return /consent_penelitian/.test(raw)
+    ? 'Kolom persetujuan penelitian belum ada di database. Jalankan supabase/consent_penelitian.sql lebih dulu.'
+    : raw;
+}
 
 /** Tabel anak yang punya kolom `patient_id`. */
 type TabelPasien =
@@ -181,8 +189,36 @@ export default function EksporScreen() {
       const galatPenting = [sl.error, ci.error, me.error, ml.error].find(Boolean);
       if (galatPenting) throw new Error(galatPenting.message);
 
+      // Izin penelitian ada di `profiles`, sedangkan data dikunci `patients.id`.
+      // Pemetaannya dilakukan di sini, dan pasien yang profilnya gagal dibaca
+      // TIDAK diikutkan — ketiadaan jawaban bukan izin.
+      const prof = await supabase
+        .from('profiles')
+        .select('id, consent_penelitian')
+        .in(
+          'id',
+          pasien.map((p) => p.profile_id)
+        );
+      if (prof.error) throw new Error(pesanConsent(prof.error.message));
+
+      const setuju = new Set(
+        ((prof.data ?? []) as Pick<Profile, 'id' | 'consent_penelitian'>[])
+          .filter((x) => x.consent_penelitian === true)
+          .map((x) => x.id)
+      );
+      const izinPenelitian = pasien.filter((p) => setuju.has(p.profile_id)).map((p) => p.id);
+
+      if (izinPenelitian.length === 0) {
+        setErr(
+          'Belum ada pasien Anda yang menyetujui penggunaan datanya untuk penelitian. Ekspor dibatalkan.'
+        );
+        setBusy(false);
+        return;
+      }
+
       const berkas = rakitEkspor({
         pasien,
+        izinPenelitian,
         sledai: (sl.data ?? []) as SledaiAssessment[],
         checkins: (ci.data ?? []) as DailyCheckin[],
         meds: (me.data ?? []) as Medication[],

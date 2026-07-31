@@ -15,8 +15,12 @@
  *   tidak menyebut bahwa data disimpan di Singapura, dan tidak menyebut bahwa
  *   koordinat dikirim ke Open-Meteo saat izin lokasi diberikan. Keduanya aliran
  *   data yang nyata dan seharusnya ada sejak awal.
+ * - `2026-07-31b` — memisahkan persetujuan PENGGUNAAN dari persetujuan
+ *   PENELITIAN. Sebelumnya keduanya satu centang, sehingga pasien yang menolak
+ *   penelitian tidak bisa memakai aplikasi untuk perawatannya sendiri —
+ *   keikutsertaan seperti itu tidak benar-benar sukarela.
  */
-export const CONSENT_VERSION = '2026-07-31';
+export const CONSENT_VERSION = '2026-07-31b';
 
 export const CONSENT = {
   judul: 'Aplikasi & Penelitian "Teman Lupus"',
@@ -48,8 +52,12 @@ export const CONSENT_PARAGRAF: { judul: string; isi: string }[] = [
     isi: 'Aplikasi menyimpan data Anda pada layanan Supabase dengan server di Singapura. Bila Anda mengizinkan akses lokasi, koordinat perkiraan (ketelitian sekitar 1 km) dikirim ke layanan cuaca Open-Meteo semata-mata untuk menampilkan indeks UV harian; koordinat itu tidak disimpan dan tidak digabungkan dengan data medis Anda. Izin lokasi boleh ditolak tanpa memengaruhi fungsi lain.',
   },
   {
+    judul: 'Dua persetujuan yang terpisah',
+    isi: 'Persetujuan PEMAKAIAN aplikasi bersifat wajib — tanpa itu data Anda tidak bisa disimpan dan aplikasi tidak dapat digunakan. Persetujuan PENELITIAN terpisah dan sepenuhnya pilihan Anda: menolaknya tidak mengurangi satu pun fitur, dan tidak memengaruhi pelayanan medis yang Anda terima.',
+  },
+  {
     judul: 'Sukarela',
-    isi: 'Keikutsertaan bersifat sukarela. Anda boleh berhenti kapan saja tanpa memengaruhi pelayanan medis yang Anda terima.',
+    isi: 'Keikutsertaan penelitian bersifat sukarela dan boleh dihentikan kapan saja lewat layar Profil, tanpa perlu memberi alasan. Data yang sudah terlanjur ikut analisis sebelum Anda berhenti tidak dapat ditarik kembali dari berkas yang sudah dibuat — di sana Anda hanya diwakili kode, tanpa nama.',
   },
   {
     judul: 'Risiko & manfaat',

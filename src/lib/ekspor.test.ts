@@ -71,6 +71,8 @@ function data(d: Partial<DataEkspor> = {}): DataEkspor {
     alerts: [],
     tindakLanjut: [],
     lupusqol: [],
+    // Tanpa ini setiap test lama akan mengekspor nol baris.
+    izinPenelitian: [P1, P2],
     mars: [],
     flares: [],
     labs: [],
@@ -541,5 +543,152 @@ describe('lupusqol.csv', () => {
     expect(k).toContain('makin tinggi makin BAIK');
     expect(k).toContain('Anindito');
     expect(k).toContain('lupusqol_tanpa_skor_total');
+  });
+});
+
+describe('gerbang izin penelitian', () => {
+  /** Data lengkap untuk DUA pasien di setiap tabel. */
+  const berdua = (izin: string[]): DataEkspor =>
+    data({
+      izinPenelitian: izin,
+      pasien: [pasien(), pasien({ id: P2 })],
+      sledai: [sledai({ patient_id: P1 }), sledai({ patient_id: P2 })],
+      checkins: [
+        checkin({ tanggal: '2026-07-29', patient_id: P1, catatan: 'catatan P1' }),
+        checkin({ tanggal: '2026-07-29', patient_id: P2, catatan: 'catatan P2' }),
+      ],
+      flares: [
+        {
+          id: 'fa',
+          patient_id: P1,
+          waktu: '2026-07-05T10:00:00+07:00',
+          tanda_bahaya: null,
+          gejala: null,
+          hasil: 'red',
+        },
+        {
+          id: 'fb',
+          patient_id: P2,
+          waktu: '2026-07-05T10:00:00+07:00',
+          tanda_bahaya: null,
+          gejala: null,
+          hasil: 'red',
+        },
+      ],
+      alerts: [
+        {
+          id: 'aa',
+          patient_id: P1,
+          flare_check_id: 'fa',
+          jenis: 'flare_darurat',
+          pesan: null,
+          selesai: true,
+          created_at: '2026-07-05T10:00:00+07:00',
+        },
+        {
+          id: 'ab',
+          patient_id: P2,
+          flare_check_id: 'fb',
+          jenis: 'flare_darurat',
+          pesan: null,
+          selesai: true,
+          created_at: '2026-07-05T10:00:00+07:00',
+        },
+      ],
+      tindakLanjut: [
+        {
+          id: 't1',
+          alert_id: 'aa',
+          doctor_id: 'd1',
+          tindakan: 'dirujuk',
+          kondisi: 'dirawat_inap',
+          catatan: null,
+          dibuat_pada: '2026-07-05T12:00:00+07:00',
+        },
+        {
+          id: 't2',
+          alert_id: 'ab',
+          doctor_id: 'd1',
+          tindakan: 'edukasi',
+          kondisi: 'membaik_sendiri',
+          catatan: null,
+          dibuat_pada: '2026-07-05T12:00:00+07:00',
+        },
+      ],
+      lupusqol: [
+        {
+          id: 'q1',
+          patient_id: P1,
+          tanggal: '2026-07-30',
+          jawaban: { nyeri_1: 4 },
+          tak_berlaku: [],
+          created_at: '2026-07-30T08:00:00+07:00',
+        },
+        {
+          id: 'q2',
+          patient_id: P2,
+          tanggal: '2026-07-30',
+          jawaban: { nyeri_1: 0 },
+          tak_berlaku: [],
+          created_at: '2026-07-30T08:00:00+07:00',
+        },
+      ],
+    });
+
+  const KODE_P2 = 'aaaabbbb';
+
+  it('pasien yang menolak tidak muncul di SATU BERKAS PUN', () => {
+    // Menyaring pasien.csv saja tapi lupa checkin.csv adalah kebocoran yang
+    // tidak menimbulkan galat apa pun. Karena itu diperiksa menyeluruh.
+    const berkas = rakitEkspor(berdua([P1]));
+    for (const b of berkas) {
+      expect(b.isi).not.toContain(KODE_P2);
+    }
+  });
+
+  it('pasien yang menyetujui tetap lengkap', () => {
+    const berkas = rakitEkspor(berdua([P1]));
+    const adaP1 = berkas.filter((b) => b.isi.includes('0f8c1a2b')).map((b) => b.nama);
+    expect(adaP1).toEqual(
+      expect.arrayContaining(['pasien.csv', 'sledai.csv', 'checkin.csv', 'cek_flare.csv'])
+    );
+  });
+
+  it('tindak lanjut ikut tersaring lewat peringatannya, bukan patient_id', () => {
+    // `alert_tindak_lanjut` tidak punya kolom patient_id; kalau penyaringannya
+    // lupa, keluaran klinis pasien yang menolak tetap terekspor.
+    const b = ambil(rakitEkspor(berdua([P1])), 'cek_flare.csv');
+    expect(b.isi).toContain('dirujuk');
+    expect(b.isi).not.toContain('edukasi');
+  });
+
+  it('daftar izin kosong menghasilkan ekspor kosong, bukan ekspor penuh', () => {
+    // Kegagalan yang paling berbahaya: gerbang yang salah arah membalik
+    // "tidak ada yang mengizinkan" jadi "semua boleh".
+    const berkas = rakitEkspor(berdua([]));
+    for (const b of berkas) {
+      if (b.nama === 'keterangan.csv') continue;
+      expect(b.baris).toBe(0);
+    }
+  });
+
+  it('semua berkas tetap ada meski nol baris', () => {
+    // Berkas yang hilang tidak bisa dibedakan dari ekspor yang gagal separuh.
+    expect(rakitEkspor(berdua([])).length).toBe(rakitEkspor(berdua([P1, P2])).length);
+  });
+
+  it('id yang tidak dikenal di daftar izin tidak meloloskan siapa pun', () => {
+    const berkas = rakitEkspor(berdua(['bukan-id-siapa-siapa']));
+    for (const b of berkas) {
+      if (b.nama === 'keterangan.csv') continue;
+      expect(b.baris).toBe(0);
+    }
+  });
+
+  it('keterangan.csv mencatat dasar penyertaannya', () => {
+    const k = ambil(rakitEkspor(berdua([P1])), 'keterangan.csv').isi;
+    expect(k).toContain('dasar_penyertaan');
+    expect(k).toContain('consent_penelitian');
+    expect(k).toContain('jumlah_pasien,1');
   });
 });

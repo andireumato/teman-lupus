@@ -54,7 +54,7 @@ function pesanGalat(pesan: string): string {
 }
 
 export default function ProfilScreen() {
-  const { patientId, profile, reload, signOut } = useSession();
+  const { patientId, profile, reload, signOut, ubahConsentPenelitian } = useSession();
   const router = useRouter();
   const profileId = profile?.id ?? '';
 
@@ -65,6 +65,7 @@ export default function ProfilScreen() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+  const [ubahRiset, setUbahRiset] = useState(false);
 
   const hariIni = todayISO();
   const cek = periksaTanggalLahir(tglLahir, hariIni);
@@ -139,6 +140,24 @@ export default function ProfilScreen() {
     setInfo('Profil tersimpan.');
   }
 
+  async function setRiset(ikut: boolean) {
+    if (ikut === profile?.consent_penelitian) return;
+    setErr(null);
+    setInfo(null);
+    setUbahRiset(true);
+    try {
+      await ubahConsentPenelitian(ikut);
+      setInfo(
+        ikut
+          ? 'Terima kasih. Data Anda akan ikut dianalisis tanpa nama.'
+          : 'Data Anda tidak akan ikut penelitian. Aplikasi tetap bisa dipakai seperti biasa.'
+      );
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Gagal menyimpan pilihan.');
+    }
+    setUbahRiset(false);
+  }
+
   if (loading) return <Loading />;
 
   return (
@@ -181,6 +200,29 @@ export default function ProfilScreen() {
       </Card>
 
       <DokterSaya patientId={patientId} />
+
+      <Card>
+        <SectionLabel>Keikutsertaan penelitian</SectionLabel>
+        <Text style={styles.ket}>
+          Boleh diubah kapan saja, dan tidak memengaruhi pelayanan medis maupun fitur aplikasi.
+          Kalau Anda berhenti ikut, data Anda tidak lagi disertakan pada analisis berikutnya.
+        </Text>
+        <Segmented
+          options={[
+            { v: 'ya', label: 'Ikut penelitian' },
+            { v: 'tidak', label: 'Tidak ikut' },
+          ]}
+          value={
+            profile?.consent_penelitian == null ? null : profile.consent_penelitian ? 'ya' : 'tidak'
+          }
+          onChange={(v) => void setRiset(v === 'ya')}
+        />
+        {ubahRiset && <Text style={styles.ket}>Menyimpan…</Text>}
+        <Text style={styles.ket}>
+          Data yang sudah terlanjur ikut ekspor sebelum Anda berhenti tidak bisa ditarik dari berkas
+          yang sudah dibuat — di sana Anda hanya diwakili kode, tanpa nama.
+        </Text>
+      </Card>
 
       <Card>
         <SectionLabel>Akun</SectionLabel>

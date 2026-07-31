@@ -68,8 +68,55 @@ export interface DataEkspor {
   lupusqol: LupusQolAssessment[];
   labs: LabResult[];
   visits: Visit[];
+  /**
+   * `patients.id` yang PEMILIKNYA menyetujui penelitian.
+   *
+   * Pasien di luar daftar ini dibuang dari SELURUH tabel sebelum apa pun
+   * dirakit — lihat `saringIzin()`. Larik kosong berarti tidak ada satu pun
+   * yang menyetujui, dan ekspornya memang kosong; itu hasil yang benar, bukan
+   * kegagalan.
+   */
+  izinPenelitian: string[];
   /** Tanggal ekspor, dipakai menghitung usia & lama sakit. */
   tanggal: string;
+}
+
+/**
+ * Membuang seluruh data pasien yang tidak menyetujui penelitian.
+ *
+ * SATU gerbang di pintu masuk, bukan penyaringan per tabel. Menyaring dua
+ * belas tabel satu per satu berarti dua belas kesempatan untuk lupa — dan yang
+ * terlupa adalah data kesehatan orang yang menyatakan tidak mau ikut. Tabel
+ * baru yang ditambahkan nanti otomatis ikut tersaring di sini, asal ia punya
+ * `patient_id`.
+ *
+ * `tindakLanjut` disaring lewat peringatan yang sudah lolos, bukan lewat
+ * `patient_id` — ia memang tidak punya kolom itu.
+ */
+function saringIzin(d: DataEkspor): DataEkspor {
+  const boleh = new Set(d.izinPenelitian);
+  const p = <T extends { patient_id: string }>(rows: T[]) =>
+    rows.filter((r) => boleh.has(r.patient_id));
+
+  const alerts = p(d.alerts);
+  const idAlert = new Set(alerts.map((a) => a.id));
+
+  return {
+    ...d,
+    pasien: d.pasien.filter((x) => boleh.has(x.id)),
+    sledai: p(d.sledai),
+    checkins: p(d.checkins),
+    meds: p(d.meds),
+    medLogs: p(d.medLogs),
+    efekSamping: p(d.efekSamping),
+    mars: p(d.mars),
+    flares: p(d.flares),
+    alerts,
+    tindakLanjut: d.tindakLanjut.filter((t) => idAlert.has(t.alert_id)),
+    labs: p(d.labs),
+    visits: p(d.visits),
+    lupusqol: p(d.lupusqol),
+  };
 }
 
 export interface BerkasCsv {
@@ -113,7 +160,11 @@ function denganPembanding(
   );
 }
 
-export function rakitEkspor(d: DataEkspor): BerkasCsv[] {
+export function rakitEkspor(semua: DataEkspor): BerkasCsv[] {
+  // Gerbang izin dilewati SEBELUM apa pun dibaca. Segala sesuatu di bawah
+  // baris ini hanya melihat pasien yang menyetujui penelitian.
+  const d = saringIzin(semua);
+
   const namaObat = new Map(d.meds.map((m) => [m.id, m.nama_obat]));
   const obatKode = (medId: string | null) => (medId ? idPendek(medId) : null);
 
@@ -405,6 +456,10 @@ function keterangan(d: DataEkspor): BerkasCsv {
   const isi: { kunci: string; nilai: string }[] = [
     { kunci: 'tanggal_ekspor', nilai: d.tanggal },
     { kunci: 'jumlah_pasien', nilai: String(d.pasien.length) },
+    {
+      kunci: 'dasar_penyertaan',
+      nilai: 'hanya pasien yang menyetujui penelitian (profiles.consent_penelitian = true)',
+    },
     { kunci: 'jumlah_penilaian_sledai', nilai: String(d.sledai.length) },
     { kunci: 'jumlah_checkin', nilai: String(d.checkins.length) },
     { kunci: 'identitas', nilai: 'tanpa nama; kode = 8 karakter pertama UUID pasien' },
