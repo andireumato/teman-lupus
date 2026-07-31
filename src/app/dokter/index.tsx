@@ -164,6 +164,19 @@ export default function DaftarPasienScreen() {
         </Pressable>
       </Link>
 
+      <Link href="/dokter/ekspor" asChild>
+        <Pressable style={styles.akunCard}>
+          <Ionicons name="download-outline" size={18} color={Brand.ungu} />
+          <View style={styles.akunTeks}>
+            <Text style={styles.akunJudul}>Ekspor penelitian</Text>
+            <Text style={styles.akunSub}>
+              CSV tanpa nama pasien, dengan kode yang tetap sama antar ekspor.
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={Brand.teksLembut} />
+        </Pressable>
+      </Link>
+
       <Link href="/dokter/akun" asChild>
         <Pressable style={styles.akunCard}>
           <Ionicons name="key-outline" size={18} color={Brand.ungu} />

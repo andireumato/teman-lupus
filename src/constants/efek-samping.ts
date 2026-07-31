@@ -1,10 +1,14 @@
 /**
  * Efek samping obat yang dilaporkan PASIEN.
  *
- * ⚠️ DRAF — wajib direview reumatolog penanggung jawab. Daftar ini saya susun
- * dari efek samping yang lazim pada obat lupus (hidroksiklorokuin, steroid,
- * mikofenolat, azatioprin, metotreksat). Menambah, membuang, atau mengubah
- * kata-katanya adalah keputusan Anda.
+ * ✅ DISAHKAN reumatolog penanggung jawab, 30 Juli 2026 — diterima apa adanya,
+ * tanpa perubahan. Daftar ini semula disusun dari efek samping yang lazim pada
+ * obat lupus (hidroksiklorokuin, steroid, mikofenolat, azatioprin,
+ * metotreksat), dan berstatus draf sampai tanggal itu.
+ *
+ * Menambah, membuang, atau mengubah kata-katanya tetap keputusan reumatolog —
+ * jangan menyuntingnya tanpa persetujuan, dan perbarui tanggal di atas bila
+ * isinya berubah.
  *
  * Kenapa TERPISAH dari gejala check-in harian, bukan digabung:
  *

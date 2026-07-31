@@ -18,10 +18,20 @@
  */
 
 import { LABEL_EFEK } from '@/constants/efek-samping';
+import { labelJenisKelamin, labelOrgan, sistemDariOrgan } from '@/constants/klinis';
 import { SISTEM_GEJALA } from '@/constants/lupus';
 import { mundurHari, selisihHari, tanggalPendek } from '@/lib/dates';
+import { lamaSakit, usiaTahun } from '@/lib/klinis';
 import { PERTANYAAN_MENDESAK, PERTANYAAN_TANDA_BAHAYA } from '@/lib/redflag';
+import {
+  isiTindakLanjut,
+  jamRespons,
+  labelJeda,
+  type TindakLanjutRingkas,
+} from '@/lib/tindak-lanjut';
 import type {
+  Alert,
+  AlertTindakLanjut,
   DailyCheckin,
   FlareCheck,
   LabResult,
@@ -39,6 +49,19 @@ export interface RingkasanInput {
   dari: string;
   sampai: string;
   pasien: { inisial: string; id: string };
+  /**
+   * Data klinis dasar yang diisi dokter (`patients`). Boleh kosong seluruhnya —
+   * kolomnya nullable dan pasien baru belum punya isinya.
+   */
+  klinis?: {
+    /** Diisi pasien di `/profil`. */
+    tglLahir: string | null;
+    jenisKelamin: string | null;
+    /** Tiga di bawah diisi dokter di `/dokter/klinis/[id]`. */
+    tglDiagnosis: string | null;
+    klasifikasi: string | null;
+    organ: string[] | null;
+  };
   checkins: DailyCheckin[];
   /** Semua obat, termasuk yang sudah dihentikan. */
   meds: Medication[];
@@ -49,6 +72,16 @@ export interface RingkasanInput {
   efekSamping: MedSideEffect[];
   mars: MarsAssessment[];
   flares: FlareCheck[];
+  /**
+   * Peringatan otomatis dan tindak lanjutnya, untuk bagian 5.
+   *
+   * OPSIONAL, dan layar pasien sengaja tidak mengisinya: `alert_tindak_lanjut`
+   * hanya bisa dibaca dokter pemiliknya, jadi bagi pasien keduanya akan selalu
+   * kosong. Dibiarkan opsional supaya perbedaan itu terlihat di tanda tangan
+   * fungsinya, bukan tersembunyi sebagai larik kosong yang menipu.
+   */
+  alerts?: Alert[];
+  tindakLanjut?: AlertTindakLanjut[];
   labs: LabResult[];
   /** Pertanyaan yang ditulis pasien sendiri untuk kunjungan ini. */
   pertanyaan: string[];
@@ -110,6 +143,17 @@ export interface EventRedFlag {
   level: 'darurat' | 'mendesak';
   /** Label bahasa awam dari tanda yang dicentang pasien. */
   tanda: string[];
+  /** Apa yang terjadi sesudahnya. null bila belum dicatat. */
+  tindakLanjut: TindakLanjutRingkas | null;
+  /**
+   * Peringatannya sudah ditandai selesai, tapi tanpa rincian apa pun.
+   *
+   * Dibedakan dari `tindakLanjut === null` yang biasa: baris ini ditutup
+   * sebelum pencatatan tindak lanjut ada, jadi rinciannya tidak akan pernah
+   * datang. Menyamakan keduanya membuat data lama tampak seperti pekerjaan
+   * yang belum selesai, dan itu akan terus mengganggu selamanya.
+   */
+  selesaiTanpaRincian: boolean;
 }
 
 export interface Ringkasan {
@@ -121,9 +165,32 @@ export interface Ringkasan {
     jumlahCheckin: number;
     /** Jumlah hari dalam periode, untuk menghitung kelengkapan pencatatan. */
     jumlahHari: number;
+    /** Usia dalam tahun penuh di akhir periode; null bila belum diisi. */
+    usia: number | null;
+    /** "Perempuan" / "Laki-laki"; null bila belum diisi. */
+    jenisKelamin: string | null;
+    /** "4 tahun 2 bulan" sejak tanggal diagnosis; null bila belum diisi. */
+    lamaSakit: string | null;
+    /** Kriteria klasifikasi yang dipakai; null bila belum diisi. */
+    klasifikasi: string | null;
+    /** Label organ yang tercatat pernah terlibat. Kosong bila belum diisi. */
+    organ: string[];
   };
   skor: TrenSkor[];
   gejala: Record<KategoriGejala, GejalaRingkas[]>;
+  /**
+   * Sistem organ yang gejalanya dicatat pasien pada periode ini, tetapi TIDAK
+   * ada dalam daftar organ terlibat di data klinis dasar.
+   *
+   * Deskriptif, bukan kesimpulan: ini hanya menunjukkan bahwa catatan pasien
+   * dan catatan organ terlibat tidak sejalan. Penyebabnya bisa keterlibatan
+   * organ baru, bisa juga keluhan yang tidak ada hubungannya dengan lupus,
+   * atau daftar organ yang memang belum diperbarui. Yang membedakan dokter.
+   *
+   * Kosong bila daftar organ terlibat belum diisi — tanpa pembanding, "belum
+   * tercatat" tidak berarti apa-apa.
+   */
+  sistemBelumTercatat: { sistemLabel: string; items: string[] }[];
   /**
    * Kalimat deskriptif dalam satuan asli check-in: hitungan hari, tanggal
    * mulai memberat, gejala yang muncul bersamaan, dan hari yang tidak
@@ -360,6 +427,42 @@ function gejalaMenonjol(
     hasil[k].sort((a, b) => b.hari - a.hari || a.item.localeCompare(b.item));
   }
   return hasil;
+}
+
+/**
+ * Gejala yang tercatat pada sistem organ di luar daftar organ terlibat.
+ *
+ * Sengaja satu baris untuk seluruh periode, bukan penanda menempel di tiap
+ * gejala: penanda per baris membuat bagian 2 penuh label dan justru menutupi
+ * hal yang mau ditonjolkan. Semua kategori ikut dihitung — gejala yang MENETAP
+ * pada sistem yang belum tercatat sama pentingnya dengan yang baru muncul,
+ * karena artinya daftar organnya mungkin sudah tertinggal.
+ */
+function sistemBelumTercatat(
+  gejala: Record<KategoriGejala, GejalaRingkas[]>,
+  organ: string[] | null | undefined
+): Ringkasan['sistemBelumTercatat'] {
+  // Penjaganya adalah panjang daftar ORGAN, bukan jumlah sistem hasil
+  // pemetaannya. Sebagian domain (mata, gastrointestinal, antifosfolipid)
+  // sengaja tidak punya padanan gejala pasien; kalau yang diperiksa hasil
+  // pemetaan, dokter yang hanya mencatat domain-domain itu akan kehilangan
+  // seluruh penandaan tanpa ada yang memberi tahu.
+  if ((organ ?? []).length === 0) return [];
+  const tercatat = sistemDariOrgan(organ);
+
+  const per = new Map<string, { sistemLabel: string; items: Set<string> }>();
+  for (const list of Object.values(gejala)) {
+    for (const g of list) {
+      if (tercatat.has(g.system)) continue;
+      const s = per.get(g.system) ?? { sistemLabel: g.sistemLabel, items: new Set<string>() };
+      s.items.add(g.item);
+      per.set(g.system, s);
+    }
+  }
+
+  return [...per.values()]
+    .map((s) => ({ sistemLabel: s.sistemLabel, items: [...s.items].sort() }))
+    .sort((a, b) => a.sistemLabel.localeCompare(b.sistemLabel));
 }
 
 // ---------- 3. Perubahan & waktunya ----------
@@ -738,7 +841,21 @@ function ringkasObat(
 
 // ---------- 5. Event red-flag ----------
 
-function eventRedFlag(flares: FlareCheck[], dari: string, sampai: string): EventRedFlag[] {
+function eventRedFlag(
+  flares: FlareCheck[],
+  alerts: Alert[],
+  tindakLanjut: AlertTindakLanjut[],
+  dari: string,
+  sampai: string
+): EventRedFlag[] {
+  // Cek flare → peringatan → tindak lanjut. Ditelusuri lewat `flare_check_id`,
+  // bukan lewat kecocokan waktu: satu pasien bisa mengisi dua cek flare dalam
+  // menit yang sama, dan pasangan yang tertukar akan mengarang keluaran klinis.
+  const alertPerFlare = new Map(
+    alerts.filter((a) => a.flare_check_id).map((a) => [a.flare_check_id!, a])
+  );
+  const lanjutPerAlert = new Map(tindakLanjut.map((t) => [t.alert_id, t]));
+
   return flares
     .filter((f) => {
       if (f.hasil !== 'red' && f.hasil !== 'yellow') return false;
@@ -752,11 +869,26 @@ function eventRedFlag(flares: FlareCheck[], dari: string, sampai: string): Event
           .filter(([, v]) => v === true)
           .map(([k]) => LABEL_TANDA.get(k) ?? k)
       );
+
+      const alert = alertPerFlare.get(f.id);
+      const lanjut = alert ? lanjutPerAlert.get(alert.id) : undefined;
+
       return {
         id: f.id,
         waktu: f.waktu,
         level: f.hasil === 'red' ? ('darurat' as const) : ('mendesak' as const),
         tanda: dicentang,
+        tindakLanjut: lanjut
+          ? {
+              waktu: lanjut.dibuat_pada,
+              // Diukur dari terbitnya peringatan, bukan dari waktu cek flare:
+              // itulah saat yang dokter benar-benar bisa melihatnya.
+              jam: jamRespons(alert?.created_at, lanjut.dibuat_pada),
+              tindakan: lanjut.tindakan,
+              kondisi: lanjut.kondisi,
+            }
+          : null,
+        selesaiTanpaRincian: !!alert?.selesai && !lanjut,
       };
     });
 }
@@ -798,7 +930,13 @@ export function buatRingkasan(input: RingkasanInput): Ringkasan {
   const { dari, sampai } = input;
   const rows = rapikanCheckin(input.checkins, dari, sampai);
   const gejala = gejalaMenonjol(rows, dari, sampai);
-  const redflag = eventRedFlag(input.flares, dari, sampai);
+  const redflag = eventRedFlag(
+    input.flares,
+    input.alerts ?? [],
+    input.tindakLanjut ?? [],
+    dari,
+    sampai
+  );
 
   return {
     kepala: {
@@ -808,9 +946,18 @@ export function buatRingkasan(input: RingkasanInput): Ringkasan {
       sampai,
       jumlahCheckin: rows.length,
       jumlahHari: selisihHari(dari, sampai) + 1,
+      // Usia dan lama sakit dihitung sampai akhir periode, bukan sampai hari
+      // ini: ringkasan periode lama harus tetap berbunyi sama kalau dibuka
+      // lagi bulan depan.
+      usia: usiaTahun(input.klinis?.tglLahir, sampai),
+      jenisKelamin: labelJenisKelamin(input.klinis?.jenisKelamin),
+      lamaSakit: lamaSakit(input.klinis?.tglDiagnosis, sampai),
+      klasifikasi: input.klinis?.klasifikasi ?? null,
+      organ: (input.klinis?.organ ?? []).map(labelOrgan),
     },
     skor: trenSkor(rows, dari, sampai),
     gejala,
+    sistemBelumTercatat: sistemBelumTercatat(gejala, input.klinis?.organ),
     perubahan: perubahanTerkini(rows, dari, sampai),
     obat: ringkasObat(
       input.meds,
@@ -850,10 +997,26 @@ export function ringkasanTeks(r: Ringkasan): string {
   const b: string[] = [];
   const k = r.kepala;
 
-  b.push(`RINGKASAN PRA-KUNJUNGAN — ${k.inisial} · ID ${k.id}`);
+  // Usia & jenis kelamin menempel pada baris identitas, bukan baris klinis:
+  // keduanya konteks untuk membaca SEMUA isi di bawahnya, bukan salah satu
+  // bagiannya. Yang kosong hilang tanpa meninggalkan pemisah menggantung.
+  const diri = [k.jenisKelamin, k.usia != null ? `${k.usia} tahun` : null]
+    .filter(Boolean)
+    .join(', ');
+  b.push(
+    `RINGKASAN PRA-KUNJUNGAN — ${[k.inisial, diri || null, `ID ${k.id}`].filter(Boolean).join(' · ')}`
+  );
   b.push(
     `Periode: ${tanggalPendek(k.dari)} s/d ${tanggalPendek(k.sampai)} · Check-in: ${k.jumlahCheckin} dari ${k.jumlahHari} hari`
   );
+  // Baris data klinis dasar hanya muncul bila ada isinya: baris berisi tiga
+  // tanda "—" tidak memberi tahu apa pun selain bahwa kolomnya kosong.
+  const klinis = [
+    k.lamaSakit ? `Sejak diagnosis: ${k.lamaSakit}` : null,
+    k.klasifikasi,
+    k.organ.length > 0 ? `Organ terlibat: ${k.organ.join(', ')}` : null,
+  ].filter(Boolean);
+  if (klinis.length > 0) b.push(klinis.join(' · '));
   b.push('');
 
   b.push('1. SKOR HARIAN (bukan PRO tervalidasi)');
@@ -874,6 +1037,13 @@ export function ringkasanTeks(r: Ringkasan): string {
   b.push(`   - Makin sering: ${daftarGejala(r.gejala.memburuk)}`);
   b.push(`   - Menetap: ${daftarGejala(r.gejala.menetap)}`);
   b.push(`   - Berkurang: ${daftarGejala(r.gejala.membaik)}`);
+  if (r.sistemBelumTercatat.length > 0) {
+    b.push(
+      `   - Di luar organ terlibat yang tercatat: ${r.sistemBelumTercatat
+        .map((s) => `${s.sistemLabel} (${s.items.join(', ')})`)
+        .join('; ')}`
+    );
+  }
   b.push('');
 
   b.push('3. PERUBAHAN & WAKTUNYA (deskriptif, bukan penilaian aktivitas penyakit)');
@@ -935,11 +1105,26 @@ export function ringkasanTeks(r: Ringkasan): string {
     b.push('   - Tidak ada peringatan red-flag pada periode ini.');
   } else {
     for (const e of r.redflag) {
-      const tindak =
+      const arahan =
         e.level === 'darurat' ? 'diarahkan ke IGD' : 'diarahkan menghubungi tim ≤24 jam';
       b.push(
-        `   - ${tanggalPendek(e.waktu)} · ${e.level} · ${e.tanda.join(', ') || 'tanpa tanda tercentang'} → ${tindak} (tindak lanjut pasien belum tercatat)`
+        `   - ${tanggalPendek(e.waktu)} · ${e.level} · ${e.tanda.join(', ') || 'tanpa tanda tercentang'}`
       );
+      b.push(`       → ${arahan}`);
+
+      // Tiga keadaan yang sengaja dibedakan. "Belum ditindaklanjuti" adalah
+      // temuan yang perlu dilihat dokter; "ditutup tanpa rincian" adalah baris
+      // lama yang tidak akan pernah lengkap. Menyamakan keduanya membuat yang
+      // pertama tenggelam di antara yang kedua.
+      if (e.tindakLanjut) {
+        const jeda = labelJeda(e.tindakLanjut.jam);
+        const kapan = tanggalPendek(e.tindakLanjut.waktu) + (jeda ? ` (${jeda})` : '');
+        b.push(`       → ${kapan}: ${isiTindakLanjut(e.tindakLanjut)}`);
+      } else if (e.selesaiTanpaRincian) {
+        b.push('       → ditandai selesai, tanpa rincian');
+      } else {
+        b.push('       → belum ditindaklanjuti');
+      }
     }
   }
   b.push('');

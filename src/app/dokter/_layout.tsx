@@ -22,6 +22,9 @@ export default function DokterLayout() {
       <Stack.Screen name="akun" options={{ title: 'Akun Dokter' }} />
       <Stack.Screen name="pasien/[id]" options={{ title: 'Ringkasan Pasien' }} />
       <Stack.Screen name="sledai/[id]" options={{ title: 'SLEDAI-2K' }} />
+      <Stack.Screen name="klinis/[id]" options={{ title: 'Data Klinis Dasar' }} />
+      <Stack.Screen name="target/[id]" options={{ title: 'Target Terapi' }} />
+      <Stack.Screen name="ekspor" options={{ title: 'Ekspor Penelitian' }} />
     </Stack>
   );
 }

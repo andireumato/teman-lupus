@@ -1,6 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Tabs } from 'expo-router';
+import { Link, Tabs } from 'expo-router';
 import type { ColorValue } from 'react-native';
+import { Pressable, StyleSheet } from 'react-native';
 
 import { Brand } from '@/constants/brand';
 
@@ -16,6 +17,27 @@ function icon(name: IconName) {
   );
   TabIcon.displayName = `TabIcon(${name})`;
   return TabIcon;
+}
+
+/**
+ * Jalan masuk ke Profil, di tempat orang biasa mencarinya.
+ *
+ * `<Link asChild>` menolak `style` berbentuk larik, jadi gayanya diratakan
+ * dulu — pelajaran yang sama dari daftar pasien sisi dokter.
+ */
+function TombolProfil() {
+  return (
+    <Link href="/profil" asChild>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Profil saya"
+        hitSlop={10}
+        style={StyleSheet.flatten([styles.profil])}
+      >
+        <Ionicons name="person-circle-outline" size={26} color="#fff" />
+      </Pressable>
+    </Link>
+  );
 }
 
 export default function TabsLayout() {
@@ -37,6 +59,7 @@ export default function TabsLayout() {
           title: 'Check-in',
           headerTitle: 'Teman Lupus',
           tabBarIcon: icon('home-outline'),
+          headerRight: () => <TombolProfil />,
         }}
       />
       <Tabs.Screen
@@ -73,3 +96,7 @@ export default function TabsLayout() {
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  profil: { marginRight: 14 },
+});

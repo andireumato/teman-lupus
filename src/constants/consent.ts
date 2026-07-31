@@ -6,7 +6,17 @@
  * jangan diubah tanpa menaikkan versi.
  */
 
-export const CONSENT_VERSION = '2026-07-03';
+/**
+ * Riwayat versi — supaya alasan setiap permintaan setuju-ulang bisa ditelusuri
+ * saat audit etik.
+ *
+ * - `2026-07-03` — naskah awal.
+ * - `2026-07-31` — menambah paragraf "Lokasi & layanan luar". Naskah sebelumnya
+ *   tidak menyebut bahwa data disimpan di Singapura, dan tidak menyebut bahwa
+ *   koordinat dikirim ke Open-Meteo saat izin lokasi diberikan. Keduanya aliran
+ *   data yang nyata dan seharusnya ada sejak awal.
+ */
+export const CONSENT_VERSION = '2026-07-31';
 
 export const CONSENT = {
   judul: 'Aplikasi & Penelitian "Teman Lupus"',
@@ -32,6 +42,10 @@ export const CONSENT_PARAGRAF: { judul: string; isi: string }[] = [
   {
     judul: 'Kerahasiaan',
     isi: 'Data disimpan pada server aman. Hanya Anda dan dokter yang Anda hubungkan yang dapat mengaksesnya. Untuk publikasi ilmiah, data disajikan tanpa identitas (anonim).',
+  },
+  {
+    judul: 'Lokasi & layanan luar',
+    isi: 'Aplikasi menyimpan data Anda pada layanan Supabase dengan server di Singapura. Bila Anda mengizinkan akses lokasi, koordinat perkiraan (ketelitian sekitar 1 km) dikirim ke layanan cuaca Open-Meteo semata-mata untuk menampilkan indeks UV harian; koordinat itu tidak disimpan dan tidak digabungkan dengan data medis Anda. Izin lokasi boleh ditolak tanpa memengaruhi fungsi lain.',
   },
   {
     judul: 'Sukarela',

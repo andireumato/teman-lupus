@@ -5,9 +5,16 @@ import { useEffect } from 'react';
 import { View } from 'react-native';
 
 import { Brand } from '@/constants/brand';
+import { pasangPenangan } from '@/lib/notifikasi';
 import { SessionProvider, useSession } from '@/lib/session';
 
 SplashScreen.preventAutoHideAsync();
+
+// Dipasang di tingkat modul, sekali seumur proses: pengingat yang jatuh
+// persis saat pasien sedang membuka aplikasi harus tetap tampil, bukan
+// hilang tanpa jejak. Tidak meminta izin apa pun — itu terjadi hanya
+// ketika pasien menyalakan saklarnya di layar Obat.
+pasangPenangan();
 
 /**
  * Penjaga rute: menentukan layar mana yang boleh dilihat berdasarkan
@@ -76,8 +83,11 @@ function AuthGate() {
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="checkin" options={{ title: 'Check-in Harian' }} />
       <Stack.Screen name="mars" options={{ title: 'Kuesioner MARS-5' }} />
+      <Stack.Screen name="lupusqol" options={{ title: 'Kualitas Hidup (LupusQoL)' }} />
       <Stack.Screen name="ringkasan" options={{ title: 'Ringkasan Pra-Kunjungan' }} />
       <Stack.Screen name="efek-samping" options={{ title: 'Efek Samping Obat' }} />
+      <Stack.Screen name="profil" options={{ title: 'Profil Saya' }} />
+      <Stack.Screen name="hapus-akun" options={{ title: 'Hapus Akun' }} />
       <Stack.Screen name="dokter" options={{ headerShown: false }} />
     </Stack>
   );

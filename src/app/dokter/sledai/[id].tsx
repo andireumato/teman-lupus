@@ -18,6 +18,7 @@ import { SLEDAI_DESKRIPTOR, SLEDAI_KELOMPOK } from '@/constants/sledai';
 import { todayISO } from '@/lib/dates';
 import { useSession } from '@/lib/session';
 import { scoreSledai, SLEDAI_MAKS } from '@/lib/sledai';
+import { skorKlinis } from '@/lib/target';
 import { supabase } from '@/lib/supabase';
 
 export default function SledaiScreen() {
@@ -53,6 +54,9 @@ export default function SledaiScreen() {
       deskriptor,
       total: skor.total,
       kategori: skor.kategori,
+      // PGA, dosis steroid, dan kestabilan terapi diisi di layar Target
+      // terapi, yang MEMPERBARUI baris ini. Tidak disebut di sini supaya
+      // tidak menimpa isian yang sudah ada bila SLEDAI diisi ulang.
     });
 
     setBusy(false);
@@ -66,8 +70,9 @@ export default function SledaiScreen() {
   return (
     <Screen>
       <InfoBar>
-        Centang deskriptor yang ada dalam <Text style={styles.tebal}>30 hari terakhir</Text> — bukan
-        hanya saat pemeriksaan. Skor dihitung otomatis dari bobotnya.
+        Centang deskriptor yang ada{' '}
+        <Text style={styles.tebal}>saat pemeriksaan atau dalam 10 hari terakhir</Text>. Skor
+        dihitung otomatis dari bobotnya.
       </InfoBar>
 
       {err && <Msg tone="err">{err}</Msg>}
@@ -78,6 +83,7 @@ export default function SledaiScreen() {
           <Text style={styles.skorMaks}> / {SLEDAI_MAKS}</Text>
         </Text>
         <Text style={styles.skorKategori}>{skor.kategori}</Text>
+        <Text style={styles.skorKlinis}>clinical SLEDAI-2K {skorKlinis(dipilih)}</Text>
         {skor.aktif.length > 0 && (
           <Text style={styles.skorRincian}>
             {skor.aktif.map((d) => `${d.label} (${d.bobot})`).join(' · ')}
@@ -191,5 +197,6 @@ const styles = StyleSheet.create({
   bobotText: { fontSize: 12, fontWeight: '700', color: '#6b7280' },
   bobotTextOn: { color: '#fff' },
   catatan: { fontSize: 11.5, color: Brand.teksLembut, lineHeight: 17 },
+  skorKlinis: { fontSize: 12.5, fontWeight: '600', color: '#5b5566' },
   tebal: { fontWeight: '700' },
 });

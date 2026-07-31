@@ -17,8 +17,10 @@ import {
   Segmented,
 } from '@/components/ui/kit';
 import { Brand, radius, space } from '@/constants/brand';
+import { PengingatCard } from '@/components/pengingat-card';
 import { DISCLAIMER } from '@/constants/consent';
 import { tanggalPendek, todayISO } from '@/lib/dates';
+import { bacaJam, sesuaikanJam } from '@/lib/pengingat';
 import { useSession } from '@/lib/session';
 import { supabase } from '@/lib/supabase';
 import type { MedLog, Medication, MedicationEvent } from '@/types/database';
@@ -39,6 +41,9 @@ const kunciDosis = (medicationId: string, slot: number) => `${medicationId}|${sl
 
 /** Tabel/kolom baru belum tentu ada di project Supabase lama. */
 function pesanSkemaObat(pesan: string): string {
+  if (/\bjam\b/.test(pesan)) {
+    return 'Kolom jam minum belum ada di database. Jalankan supabase/pengingat_obat.sql lebih dulu.';
+  }
   return /frekuensi|slot|medication_events/.test(pesan)
     ? 'Skema obat di Supabase belum diperbarui. Jalankan supabase/obat_frekuensi_dan_riwayat.sql di SQL Editor.'
     : pesan;
@@ -58,6 +63,8 @@ export default function ObatScreen() {
   const [dosis, setDosis] = useState('');
   const [jadwal, setJadwal] = useState('');
   const [frekuensi, setFrekuensi] = useState(1);
+  const [jamId, setJamId] = useState<string | null>(null);
+  const [jamDraf, setJamDraf] = useState<string[]>([]);
   /** id obat yang sedang ditanyai alasan berhentinya. */
   const [hentikanId, setHentikanId] = useState<string | null>(null);
   const [alasanHenti, setAlasanHenti] = useState('');
@@ -180,6 +187,12 @@ export default function ObatScreen() {
         dosis: dosis.trim() || null,
         jadwal: jadwal.trim() || null,
         frekuensi,
+        // Jam bawaan langsung diisi supaya pengingat bekerja tanpa perlu
+        // satu langkah pengaturan lagi. Formulir tambah obat sengaja tidak
+        // menanyakannya: pasien yang baru menambah obat belum tentu tahu
+        // jamnya, dan menahan penyimpanan karenanya membuat obat itu tidak
+        // tercatat sama sekali. Bisa diubah kapan saja di kartu obatnya.
+        jam: sesuaikanJam(null, frekuensi),
       })
       .select('id')
       .maybeSingle();
@@ -261,6 +274,38 @@ export default function ObatScreen() {
     await muat();
   }
 
+  /**
+   * Ringkasan jam untuk label tombol, mis. "08:00, 20:00" atau "belum diatur".
+   * Jam yang tidak terbaca tidak ikut ditampilkan — ia juga tidak akan
+   * dijadwalkan, jadi menampilkannya akan menjanjikan pengingat yang tak ada.
+   */
+  function ringkasJam(med: Medication, n: number): string {
+    const isi = Array.from({ length: n }, (_, i) => med.jam?.[i]).filter((j) => bacaJam(j) != null);
+    return isi.length === 0 ? 'belum diatur' : isi.join(', ');
+  }
+
+  async function simpanJam(med: Medication) {
+    setErr(null);
+    // Yang kosong disimpan sebagai string kosong, bukan dibuang: posisi tiap
+    // jam harus tetap sejajar dengan nomor dosisnya. Jam kosong berarti dosis
+    // itu tidak diingatkan, dan itu pilihan yang sah.
+    const bersih = jamDraf.map((j) => (bacaJam(j) ? j.trim() : ''));
+    const salah = jamDraf.filter((j) => j.trim() !== '' && !bacaJam(j));
+    if (salah.length > 0) {
+      setErr(`Jam "${salah[0].trim()}" tidak terbaca. Pakai format 24 jam seperti 07:30.`);
+      return;
+    }
+
+    const { error } = await supabase.from('medications').update({ jam: bersih }).eq('id', med.id);
+
+    if (error) {
+      setErr(pesanSkemaObat(`Gagal menyimpan jam: ${error.message}`));
+      return;
+    }
+    setJamId(null);
+    await muat();
+  }
+
   function konfirmasiHapus(med: Medication) {
     const n = jumlahCatatan(med.id);
     Alert.alert(
@@ -325,6 +370,8 @@ export default function ObatScreen() {
         </Text>
       </Card>
 
+      <PengingatCard meds={meds} />
+
       {meds.map((m) => {
         const n = m.frekuensi ?? 1;
         return (
@@ -351,6 +398,56 @@ export default function ObatScreen() {
                 </Pressable>
               </View>
             </View>
+
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => {
+                setJamId(jamId === m.id ? null : m.id);
+                setJamDraf(sesuaikanJam(m.jam, n));
+              }}
+              hitSlop={8}
+            >
+              <Text style={styles.aturJam}>
+                {jamId === m.id ? 'Tutup pengaturan jam' : `Jam minum: ${ringkasJam(m, n)}`}
+              </Text>
+            </Pressable>
+
+            {jamId === m.id && (
+              <View style={styles.formHenti}>
+                {jamDraf.map((j, i) => (
+                  <Field
+                    key={i}
+                    label={n > 1 ? `Jam dosis ke-${i + 1}` : 'Jam minum'}
+                    value={j}
+                    onChangeText={(t) =>
+                      setJamDraf((prev) => prev.map((x, k) => (k === i ? t : x)))
+                    }
+                    placeholder="08:00"
+                    autoCapitalize="none"
+                    keyboardType="numbers-and-punctuation"
+                  />
+                ))}
+                <Text style={styles.hint}>
+                  Format 24 jam, mis. 07:30 atau 19:00. Jam yang dikosongkan tidak diingatkan.
+                </Text>
+                <View style={styles.aksi}>
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => void simpanJam(m)}
+                    style={[styles.tombolKecil, styles.tombolSimpanJam]}
+                  >
+                    <Text style={styles.tombolSimpanJamText}>Simpan jam</Text>
+                  </Pressable>
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => setJamId(null)}
+                    style={styles.tombolKecil}
+                  >
+                    <Text style={styles.tombolKecilText}>Batal</Text>
+                  </Pressable>
+                </View>
+              </View>
+            )}
 
             {hentikanId === m.id && (
               <View style={styles.formHenti}>
@@ -412,6 +509,7 @@ export default function ObatScreen() {
                   </View>
                   <Text style={[styles.dosisLabel, sudah && styles.dosisLabelOn]}>
                     {n > 1 ? `Dosis ke-${slot + 1}` : 'Sudah diminum hari ini'}
+                    {bacaJam(m.jam?.[slot]) ? ` · ${m.jam![slot]}` : ''}
                   </Text>
                   {log?.diminum === false && <Text style={styles.belum}>ditandai belum</Text>}
                 </Pressable>
@@ -502,6 +600,9 @@ export default function ObatScreen() {
 
 const styles = StyleSheet.create({
   ringkas: { fontSize: 13, color: Brand.teks },
+  aturJam: { fontSize: 12.5, fontWeight: '600', color: Brand.ungu },
+  tombolSimpanJam: { backgroundColor: Brand.ungu, borderColor: Brand.ungu },
+  tombolSimpanJamText: { fontSize: 12.5, fontWeight: '700', color: '#fff' },
   hint: { fontSize: 11.5, color: Brand.teksLembut, lineHeight: 16 },
   fieldLabel: { fontSize: 13, fontWeight: '600', color: '#374151' },
   medHead: { flexDirection: 'row', alignItems: 'flex-start', gap: space.sm },

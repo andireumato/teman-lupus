@@ -21,7 +21,8 @@
       "predictiveBackGestureEnabled": false,
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_FINE_LOCATION"
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.SCHEDULE_EXACT_ALARM"
       ]
     },
     "web": {
@@ -39,11 +40,20 @@
         }
       ],
       [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/android-icon-monochrome.png",
+          "color": "#7c3aed",
+          "defaultChannel": "obat-v3"
+        }
+      ],
+      [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Teman Lupus memakai lokasimu hanya untuk menampilkan indeks UV harian di daerahmu. Lokasi tidak dikirim ke server dan tidak disimpan bersama data medismu."
+          "locationWhenInUsePermission": "Teman Lupus memakai lokasimu hanya untuk menampilkan indeks UV harian di daerahmu. Koordinatmu dikirim ke layanan cuaca Open-Meteo untuk menanyakan angka UV, tidak disimpan di mana pun, dan tidak digabungkan dengan data medismu."
         }
-      ]
+      ],
+      "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": true,

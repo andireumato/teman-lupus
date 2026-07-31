@@ -54,7 +54,15 @@ export function RingkasanIsi({
     <>
       <Card>
         <Text style={styles.kepala}>
-          {r.kepala.inisial} · ID {r.kepala.id}
+          {[
+            r.kepala.inisial,
+            [r.kepala.jenisKelamin, r.kepala.usia != null ? `${r.kepala.usia} tahun` : null]
+              .filter(Boolean)
+              .join(', ') || null,
+            `ID ${r.kepala.id}`,
+          ]
+            .filter(Boolean)
+            .join(' · ')}
         </Text>
         <Text style={styles.kepalaSub}>
           {tanggalPendek(r.kepala.dari)} s/d {tanggalPendek(r.kepala.sampai)}
@@ -62,6 +70,20 @@ export function RingkasanIsi({
         <Text style={styles.kepalaSub}>
           {r.kepala.jumlahCheckin} check-in dari {r.kepala.jumlahHari} hari
         </Text>
+        {/* Data klinis dasar hanya muncul bila ada isinya — baris kosong
+            berisi "—" tidak memberi tahu apa pun. */}
+        {r.kepala.lamaSakit && (
+          <Text style={styles.kepalaKlinis}>
+            Sejak diagnosis {r.kepala.lamaSakit}
+            {r.kepala.klasifikasi ? ` · ${r.kepala.klasifikasi}` : ''}
+          </Text>
+        )}
+        {!r.kepala.lamaSakit && r.kepala.klasifikasi && (
+          <Text style={styles.kepalaKlinis}>{r.kepala.klasifikasi}</Text>
+        )}
+        {r.kepala.organ.length > 0 && (
+          <Text style={styles.kepalaKlinis}>Organ terlibat: {r.kepala.organ.join(', ')}</Text>
+        )}
       </Card>
 
       <Card>
@@ -94,6 +116,20 @@ export function RingkasanIsi({
         <BarisGejala judul="Makin sering" list={r.gejala.memburuk} />
         <BarisGejala judul="Menetap" list={r.gejala.menetap} />
         <BarisGejala judul="Berkurang" list={r.gejala.membaik} />
+        {r.sistemBelumTercatat.length > 0 && (
+          <View style={styles.grup}>
+            <Text style={styles.grupJudul}>Di luar organ terlibat yang tercatat</Text>
+            {r.sistemBelumTercatat.map((s) => (
+              <Text key={s.sistemLabel} style={styles.item}>
+                • {s.sistemLabel} <Text style={styles.lembut}>({s.items.join(', ')})</Text>
+              </Text>
+            ))}
+            <Text style={styles.catatanKecil}>
+              Catatan pasien dan daftar organ terlibat tidak sejalan. Bisa berarti keterlibatan
+              baru, keluhan di luar lupus, atau daftar organ yang belum diperbarui.
+            </Text>
+          </View>
+        )}
       </Card>
 
       <Card>
@@ -218,6 +254,7 @@ export function RingkasanIsi({
 const styles = StyleSheet.create({
   kepala: { fontSize: 16, fontWeight: '800', color: Brand.teks },
   kepalaSub: { fontSize: 12.5, color: Brand.teksLembut },
+  kepalaKlinis: { fontSize: 12.5, color: Brand.teks, lineHeight: 18 },
   grup: { gap: 3, marginTop: space.sm },
   grupJudul: { fontSize: 12.5, fontWeight: '700', color: '#4b5563' },
   item: { fontSize: 13, color: Brand.teks, lineHeight: 19 },

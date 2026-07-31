@@ -1,4 +1,6 @@
 import type {
+  Alert,
+  AlertTindakLanjut,
   DailyCheckin,
   FlareCheck,
   LabResult,
@@ -49,6 +51,7 @@ function med(nama: string, medId = id(), p: Partial<Medication> = {}): Medicatio
     dosis: null,
     jadwal: null,
     frekuensi: 1,
+    jam: null,
     aktif: true,
     created_at: '2026-01-01T00:00:00+07:00',
     ...p,
@@ -110,6 +113,32 @@ function flare(waktu: string, hasil: FlareCheck['hasil'], p: Partial<FlareCheck>
   };
 }
 
+function peringatan(flareId: string, p: Partial<Alert> = {}): Alert {
+  return {
+    id: id(),
+    patient_id: 'p1',
+    flare_check_id: flareId,
+    jenis: 'flare_darurat',
+    pesan: null,
+    selesai: false,
+    created_at: '2026-07-05T10:05:00+07:00',
+    ...p,
+  };
+}
+
+function lanjut(alertId: string, p: Partial<AlertTindakLanjut> = {}): AlertTindakLanjut {
+  return {
+    id: id(),
+    alert_id: alertId,
+    doctor_id: 'd1',
+    tindakan: 'obat_disesuaikan',
+    kondisi: 'masih_bergejala',
+    catatan: null,
+    dibuat_pada: '2026-07-05T14:05:00+07:00',
+    ...p,
+  };
+}
+
 function input(p: Partial<RingkasanInput> = {}): RingkasanInput {
   return {
     dari: '2026-07-01',
@@ -124,6 +153,20 @@ function input(p: Partial<RingkasanInput> = {}): RingkasanInput {
     flares: [],
     labs: [],
     pertanyaan: [],
+    ...p,
+  };
+}
+
+type Klinis = NonNullable<RingkasanInput['klinis']>;
+
+/** Data klinis dasar dengan semua kolom kosong; isi hanya yang diuji. */
+function klinis(p: Partial<Klinis> = {}): Klinis {
+  return {
+    tglLahir: null,
+    jenisKelamin: null,
+    tglDiagnosis: null,
+    klasifikasi: null,
+    organ: null,
     ...p,
   };
 }
@@ -818,6 +861,127 @@ describe('event red-flag', () => {
   });
 });
 
+// ---------- 5b. Tindak lanjut sesudah red-flag ----------
+
+describe('tindak lanjut peringatan', () => {
+  it('menautkan tindak lanjut ke cek flare yang benar', () => {
+    // Dua cek flare pada MENIT yang sama. Kalau penautannya memakai kecocokan
+    // waktu dan bukan flare_check_id, keluaran klinis kedua pasien tertukar.
+    const merah = flare('2026-07-05T10:00:00+07:00', 'red');
+    const kuning = flare('2026-07-05T10:00:00+07:00', 'yellow');
+    const aMerah = peringatan(merah.id);
+    const aKuning = peringatan(kuning.id, { jenis: 'flare_mendesak' });
+
+    const r = buatRingkasan(
+      input({
+        flares: [merah, kuning],
+        alerts: [aMerah, aKuning],
+        tindakLanjut: [
+          lanjut(aMerah.id, { tindakan: 'dirujuk', kondisi: 'dirawat_inap' }),
+          lanjut(aKuning.id, { tindakan: 'edukasi', kondisi: 'membaik_sendiri' }),
+        ],
+      })
+    );
+
+    const perLevel = new Map(r.redflag.map((e) => [e.level, e.tindakLanjut]));
+    expect(perLevel.get('darurat')?.tindakan).toBe('dirujuk');
+    expect(perLevel.get('mendesak')?.tindakan).toBe('edukasi');
+  });
+
+  it('menghitung jam respons dari terbitnya peringatan', () => {
+    const f = flare('2026-07-05T10:00:00+07:00', 'red');
+    // Peringatan terbit 10:05, tindak lanjut 14:05 → 4 jam, bukan 4 jam 5 menit
+    // dari waktu cek flare-nya.
+    const a = peringatan(f.id, { created_at: '2026-07-05T10:05:00+07:00' });
+    const r = buatRingkasan(
+      input({
+        flares: [f],
+        alerts: [a],
+        tindakLanjut: [lanjut(a.id, { dibuat_pada: '2026-07-05T14:05:00+07:00' })],
+      })
+    );
+    expect(r.redflag[0].tindakLanjut?.jam).toBe(4);
+  });
+
+  it('membedakan belum ditindaklanjuti dari ditutup tanpa rincian', () => {
+    const baru = flare('2026-07-05T10:00:00+07:00', 'red');
+    const lama = flare('2026-07-06T10:00:00+07:00', 'red');
+
+    const r = buatRingkasan(
+      input({
+        flares: [baru, lama],
+        alerts: [
+          peringatan(baru.id, { selesai: false }),
+          // Ditutup sebelum pencatatan tindak lanjut ada; rinciannya tidak
+          // akan pernah datang.
+          peringatan(lama.id, { selesai: true }),
+        ],
+        tindakLanjut: [],
+      })
+    );
+
+    expect(r.redflag[0].selesaiTanpaRincian).toBe(false);
+    expect(r.redflag[1].selesaiTanpaRincian).toBe(true);
+  });
+
+  it('tanpa data peringatan sama sekali, event tetap terbaca', () => {
+    // Jalur PASIEN: `alert_tindak_lanjut` hanya bisa dibaca dokter, jadi layar
+    // pasien tidak mengirim keduanya. Itu tidak boleh menggagalkan apa pun.
+    const r = buatRingkasan(input({ flares: [flare('2026-07-05T10:00:00+07:00', 'red')] }));
+    expect(r.redflag[0].tindakLanjut).toBeNull();
+    expect(r.redflag[0].selesaiTanpaRincian).toBe(false);
+  });
+
+  it('teksnya menulis arahan lalu hasilnya', () => {
+    const f = flare('2026-07-05T10:00:00+07:00', 'red', {
+      tanda_bahaya: { kejang: true },
+    });
+    const a = peringatan(f.id, { created_at: '2026-07-05T10:00:00+07:00' });
+    const teks = ringkasanTeks(
+      buatRingkasan(
+        input({
+          flares: [f],
+          alerts: [a],
+          tindakLanjut: [
+            lanjut(a.id, {
+              dibuat_pada: '2026-07-05T14:00:00+07:00',
+              tindakan: 'obat_disesuaikan',
+              kondisi: 'masih_bergejala',
+            }),
+          ],
+        })
+      )
+    );
+    expect(teks).toContain('→ diarahkan ke IGD');
+    expect(teks).toContain('(4 jam): masih bergejala, obat disesuaikan');
+  });
+
+  it('teksnya tidak pernah memuat catatan pribadi dokter', () => {
+    // Ringkasan ini disalin, ditempel, dan dibagikan — termasuk kepada pasien.
+    const f = flare('2026-07-05T10:00:00+07:00', 'red');
+    const a = peringatan(f.id);
+    const teks = ringkasanTeks(
+      buatRingkasan(
+        input({
+          flares: [f],
+          alerts: [a],
+          tindakLanjut: [lanjut(a.id, { catatan: 'RAHASIA curiga tidak patuh' })],
+        })
+      )
+    );
+    expect(teks).not.toContain('RAHASIA');
+    expect(teks).not.toContain('tidak patuh');
+  });
+
+  it('teksnya menandai event yang belum ditindaklanjuti', () => {
+    const teks = ringkasanTeks(
+      buatRingkasan(input({ flares: [flare('2026-07-05T10:00:00+07:00', 'red')] }))
+    );
+    expect(teks).toContain('→ belum ditindaklanjuti');
+    expect(teks).not.toContain('belum tercatat');
+  });
+});
+
 // ---------- 6 & 7 ----------
 
 describe('pertanyaan & pemantauan', () => {
@@ -889,8 +1053,15 @@ describe('ringkasanTeks', () => {
       )
     );
     expect(teks).not.toMatch(/flare aktif|naikkan dosis|turunkan dosis|sebaiknya diberi/i);
-    // Kata "diagnosis" hanya boleh muncul dalam kalimat penyangkalan.
-    for (const baris of teks.split('\n').filter((b) => /diagnosis/i.test(b))) {
+    // Aplikasi tidak boleh MENYIMPULKAN diagnosis. Kata "diagnosis" karena itu
+    // hanya boleh muncul dalam kalimat penyangkalan — kecuali pada baris data
+    // klinis dasar, yang bukan kesimpulan aplikasi melainkan tanggal yang
+    // diketikkan dokter sendiri di `/dokter/klinis/[id]`.
+    const barisDiagnosis = teks
+      .split('\n')
+      .filter((b) => /diagnosis/i.test(b))
+      .filter((b) => !b.startsWith('Sejak diagnosis:'));
+    for (const baris of barisDiagnosis) {
       expect(baris).toMatch(/bukan/i);
     }
     expect(teks).toContain('bukan alat diagnosis');
@@ -903,5 +1074,166 @@ describe('ringkasanTeks', () => {
 
   it('menyatakan skor harian bukan PRO tervalidasi', () => {
     expect(ringkasanTeks(buatRingkasan(input()))).toContain('bukan PRO tervalidasi');
+  });
+});
+
+// ---------- Data klinis dasar ----------
+
+describe('data klinis dasar', () => {
+  const KLINIS = klinis({
+    tglLahir: '1991-09-14',
+    jenisKelamin: 'perempuan',
+    tglDiagnosis: '2022-05-10',
+    klasifikasi: 'EULAR/ACR 2019',
+    organ: ['ginjal', 'mukokutan'],
+  });
+
+  it('menghitung lama sakit sampai AKHIR PERIODE, bukan sampai hari ini', () => {
+    // Ringkasan periode lama harus berbunyi sama kalau dibuka lagi bulan depan.
+    const r = buatRingkasan(input({ klinis: KLINIS }));
+    expect(r.kepala.lamaSakit).toBe('4 tahun 2 bulan');
+    expect(r.kepala.klasifikasi).toBe('EULAR/ACR 2019');
+    expect(r.kepala.organ).toEqual(['Ginjal', 'Mukokutan']);
+  });
+
+  it('kolom yang belum diisi tidak memunculkan baris kosong di teks', () => {
+    const teks = ringkasanTeks(buatRingkasan(input()));
+    expect(teks).not.toMatch(/Sejak diagnosis/);
+    expect(teks).not.toMatch(/Organ terlibat/);
+  });
+
+  it('menempatkan data klinis di kepala teks, bukan tercecer di bagian lain', () => {
+    const teks = ringkasanTeks(buatRingkasan(input({ klinis: KLINIS })));
+    expect(teks).toContain('Sejak diagnosis: 4 tahun 2 bulan');
+    expect(teks).toContain('EULAR/ACR 2019');
+    expect(teks).toContain('Organ terlibat: Ginjal, Mukokutan');
+  });
+
+  it('usia & jenis kelamin menempel pada baris identitas, bukan baris klinis', () => {
+    // Keduanya konteks untuk membaca SELURUH isi ringkasan, bukan salah satu
+    // bagiannya.
+    const teks = ringkasanTeks(buatRingkasan(input({ klinis: KLINIS })));
+    expect(teks.split('\n')[0]).toBe(
+      'RINGKASAN PRA-KUNJUNGAN — S.R. · Perempuan, 34 tahun · ID abc12345'
+    );
+  });
+
+  it('usia dihitung sampai akhir periode, dan belum bertambah sebelum ulang tahun', () => {
+    const sebelum = buatRingkasan(
+      input({ sampai: '2026-09-13', klinis: klinis({ tglLahir: '1991-09-14' }) })
+    );
+    const tepat = buatRingkasan(
+      input({ sampai: '2026-09-14', klinis: klinis({ tglLahir: '1991-09-14' }) })
+    );
+    expect(sebelum.kepala.usia).toBe(34);
+    expect(tepat.kepala.usia).toBe(35);
+  });
+
+  it('identitas tetap utuh bila usia & jenis kelamin belum diisi', () => {
+    // Tanpa penjagaan, yang tersisa adalah pemisah "·" menggantung.
+    const teks = ringkasanTeks(buatRingkasan(input()));
+    expect(teks.split('\n')[0]).toBe('RINGKASAN PRA-KUNJUNGAN — S.R. · ID abc12345');
+  });
+
+  it('salah satu terisi saja tetap terbaca wajar', () => {
+    const hanyaJk = ringkasanTeks(
+      buatRingkasan(input({ klinis: klinis({ jenisKelamin: 'laki-laki' }) }))
+    );
+    expect(hanyaJk.split('\n')[0]).toBe('RINGKASAN PRA-KUNJUNGAN — S.R. · Laki-laki · ID abc12345');
+
+    const hanyaUsia = ringkasanTeks(
+      buatRingkasan(input({ klinis: klinis({ tglLahir: '1991-09-14' }) }))
+    );
+    expect(hanyaUsia.split('\n')[0]).toBe(
+      'RINGKASAN PRA-KUNJUNGAN — S.R. · 34 tahun · ID abc12345'
+    );
+  });
+
+  it('tanggal diagnosis rusak diperlakukan seperti belum diisi', () => {
+    const r = buatRingkasan(input({ klinis: klinis({ tglDiagnosis: 'tidak tahu' }) }));
+    expect(r.kepala.lamaSakit).toBeNull();
+  });
+});
+
+describe('gejala di luar organ terlibat yang tercatat', () => {
+  const checkins = [
+    checkin({ tanggal: '2026-07-05', gejala: [gejala('kulit', 'Sariawan')] }),
+    checkin({ tanggal: '2026-07-25', gejala: [gejala('kulit', 'Sariawan')] }),
+    checkin({
+      tanggal: '2026-07-27',
+      gejala: [gejala('saraf', 'Kejang'), gejala('ginjal', 'Urin berbusa')],
+    }),
+  ];
+
+  it('menandai sistem organ yang gejalanya tercatat tapi tidak ada di daftar organ', () => {
+    const r = buatRingkasan(
+      input({
+        checkins,
+        klinis: klinis({ organ: ['mukokutan'] }),
+      })
+    );
+    expect(r.sistemBelumTercatat).toEqual([
+      { sistemLabel: 'Ginjal', items: ['Urin berbusa'] },
+      { sistemLabel: 'Saraf', items: ['Kejang'] },
+    ]);
+  });
+
+  it('sistem yang sudah tercatat terlibat tidak ikut ditandai', () => {
+    const r = buatRingkasan(
+      input({
+        checkins,
+        klinis: klinis({ organ: ['mukokutan', 'ginjal', 'neuropsikiatri'] }),
+      })
+    );
+    expect(r.sistemBelumTercatat).toEqual([]);
+  });
+
+  it('tanpa daftar organ, tidak ada yang ditandai — tak ada pembandingnya', () => {
+    const kosong = buatRingkasan(input({ checkins }));
+    expect(kosong.sistemBelumTercatat).toEqual([]);
+
+    const larikKosong = buatRingkasan(input({ checkins, klinis: klinis({ organ: [] }) }));
+    expect(larikKosong.sistemBelumTercatat).toEqual([]);
+  });
+
+  it('domain tanpa padanan gejala pasien tidak menghapus penandaan yang lain', () => {
+    // 'oftalmik' tidak memetakan ke sistem gejala mana pun; ia tidak boleh
+    // membuat daftar organ terhitung "sudah diisi untuk semua sistem".
+    const r = buatRingkasan(
+      input({
+        checkins,
+        klinis: klinis({ organ: ['oftalmik'] }),
+      })
+    );
+    expect(r.sistemBelumTercatat.map((s) => s.sistemLabel)).toEqual([
+      'Ginjal',
+      'Kulit & mulut',
+      'Saraf',
+    ]);
+  });
+
+  it('gejala menetap ikut ditandai, bukan hanya yang baru muncul', () => {
+    // Kalau hanya kategori "baru" yang dihitung, keluhan yang sudah berbulan-
+    // bulan pada organ yang belum tercatat justru tidak akan pernah terlihat.
+    const r = buatRingkasan(
+      input({
+        checkins: [
+          checkin({ tanggal: '2026-07-05', gejala: [gejala('darah', 'Mudah memar')] }),
+          checkin({ tanggal: '2026-07-25', gejala: [gejala('darah', 'Mudah memar')] }),
+        ],
+        klinis: klinis({ organ: ['mukokutan'] }),
+      })
+    );
+    expect(r.gejala.menetap.map((g) => g.item)).toContain('Mudah memar');
+    expect(r.sistemBelumTercatat).toEqual([{ sistemLabel: 'Darah', items: ['Mudah memar'] }]);
+  });
+
+  it('muncul di teks bagian 2 sebagai satu baris, bukan penanda per gejala', () => {
+    const teks = ringkasanTeks(
+      buatRingkasan(input({ checkins, klinis: klinis({ organ: ['mukokutan'] }) }))
+    );
+    expect(teks).toContain(
+      'Di luar organ terlibat yang tercatat: Ginjal (Urin berbusa); Saraf (Kejang)'
+    );
   });
 });

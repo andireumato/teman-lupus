@@ -19,11 +19,55 @@
  *   meski MENETAP — bukan hanya saat baru muncul atau kambuh. Inilah yang
  *   membedakannya dari SLEDAI asli.
  *
- * JENDELA WAKTU: deskriptor dihitung bila ada dalam **30 hari terakhir**,
- * bukan hanya saat pemeriksaan. Versi pertama layar ini keliru menulis "saat
- * ini" dan sudah diperbaiki.
+ * JENDELA WAKTU: deskriptor dihitung bila ada **saat pemeriksaan atau dalam
+ * 10 hari terakhir**.
  *
- * ⚠️ Terjemahan Indonesianya tetap perlu disahkan reumatolog penanggung jawab.
+ * Angka ini sudah dua kali berubah, jadi jejaknya ditulis lengkap:
+ *   v1  "saat ini"      — keliru, mengabaikan jendela sama sekali.
+ *   v2  "30 hari"       — diambil dari batas atas rentang "10-30 days" yang
+ *                         disebut Suszek dkk. 2024, tanpa dasar lebih jauh.
+ *   v3  "10 hari"       — 30 Juli 2026, setelah penelusuran (lihat di bawah).
+ *
+ * Dasar v3: Wang A, dkk. J Ophthalmol 2019 (PMID 31559092, PMC6735177)
+ * menyebut instrumennya sebagai SLEDAI-2K lalu menulis "The score represented
+ * manifestations which were present at the time of the visit or in the
+ * preceding 10 days", dan tidak menyebut 30 hari di mana pun. Frasa itu juga
+ * muncul persis di literatur lain.
+ *
+ * ⚠️ Sebagian penerapan memang memakai 30 hari — itulah rentang "10-30 days"
+ * pada Suszek dkk. Bedanya nyata: demam 25 hari lalu terhitung pada satu versi
+ * dan tidak pada yang lain. Protokol penelitian WAJIB menyebut yang mana.
+ *
+ * ✅ DISAHKAN reumatolog penanggung jawab, 30 Juli 2026: 24 definisi deskriptor
+ * beserta kata-kata Indonesianya diterima apa adanya, tanpa perubahan.
+ *
+ * ✅ DITELUSURI ke literatur akses terbuka, 30 Juli 2026, karena aplikasi ini
+ * akan dipakai untuk penelitian. Ke-24 definisi dicocokkan dengan Tabel I
+ * Suszek dkk. 2024 (PMC11267658). Hasilnya: 20 cocok penuh; 4 ditandai
+ * berbeda, dan setelah diperiksa ke sumber kedua, KEEMPATNYA ternyata akibat
+ * tabel Suszek yang meringkas, bukan salah di sisi kita:
+ *
+ * - Artritis. Suszek menulis "≥ 2 joints"; kita "lebih dari 2 sendi". Sumber
+ *   kedua (Quimby dkk. 2013, PMC3824559) mengutip definisi aslinya:
+ *   "More than 2 joints with pain and signs of inflammation". Versi kita
+ *   yang benar — dan bedanya bukan sepele: pasien dengan TEPAT 2 sendi radang
+ *   mendapat 0 pada satu bacaan dan 4 pada bacaan lain.
+ * - Hematuria & piuria. Suszek menulis "in the field of view"; kita "lapang
+ *   pandang besar" (high power field), sesuai naskah baku.
+ * - Peningkatan ikatan DNA. Suszek menghilangkan angkanya; frasa
+ *   "25% binding by Farr assay" ada di literatur dan kita mempertahankannya.
+ *
+ * Yang TETAP belum bisa dituntaskan: naskah asli Bombardier dkk. 1992 sendiri
+ * tidak tersedia sebagai teks akses terbuka, jadi penelusuran ini bersandar
+ * pada reproduksi pihak ketiga. Cukup kuat untuk penelitian; sebutkan sumber
+ * yang dipakai bila diminta reviewer.
+ *
+ * Yang DITEGASKAN oleh pengesahan itu: isinya benar secara klinis dan boleh
+ * dipakai memandu pencentangan. Yang TIDAK ditegaskan: kecocokan kata per kata
+ * dengan tabel definisi asli Bombardier dkk. 1992 — lihat catatan di field
+ * `definisi` di bawah. Untuk pemakaian klinis, yang pertama sudah memadai.
+ * Untuk publikasi yang mengklaim memakai SLEDAI-2K apa adanya, pembaca jurnal
+ * bisa menanyakan yang kedua.
  */
 
 export interface DeskriptorSledai {
@@ -36,11 +80,15 @@ export interface DeskriptorSledai {
   /**
    * Definisi baku deskriptor — yang menentukan boleh atau tidaknya dicentang.
    *
-   * ⚠️ BELUM DIVERIFIKASI KATA-PER-KATA. Berbeda dengan struktur, bobot, dan
-   * kategori di atas — yang dicocokkan ke sumber yang bisa dibaca — definisi
-   * ini ditulis dari pengetahuan baku SLEDAI (Bombardier dkk. 1992) karena
-   * tabel definisinya ada di lampiran yang tidak tersedia sebagai teks
-   * terbuka. Mohon dicocokkan dengan naskah aslinya sebelum dipakai ke pasien.
+   * ✅ Sudah dibaca dan disahkan reumatolog penanggung jawab (30 Juli 2026),
+   * jadi aman dipakai memandu pencentangan di klinik.
+   *
+   * ⚠️ Tetapi BELUM DICOCOKKAN KATA PER KATA dengan naskah asli. Berbeda dengan
+   * struktur, bobot, dan kategori di atas — yang ditelusuri ke sumber yang bisa
+   * dibaca — definisi ini ditulis dari pengetahuan baku SLEDAI (Bombardier dkk.
+   * 1992) karena tabel definisinya ada di lampiran yang tidak tersedia sebagai
+   * teks terbuka. Pengesahan reumatolog menjawab "apakah ini benar", bukan
+   * "apakah ini persis kalimat aslinya". Dua pertanyaan yang berbeda.
    */
   definisi: string;
 }
@@ -232,6 +280,50 @@ export const SLEDAI_DESKRIPTOR: DeskriptorSledai[] = [
     definisi: 'Leukosit kurang dari 3.000/mm³. Singkirkan sebab obat.',
   },
 ];
+
+/**
+ * Deskriptor berbasis SEROLOGI, dikeluarkan dari clinical SLEDAI-2K.
+ *
+ * cSLEDAI-2K = SLEDAI-2K tanpa anti-dsDNA dan komplemen. Dipakai DORIS 2021,
+ * yang mensyaratkan cSLEDAI-2K = 0 tetapi membiarkan aktivitas serologis tetap
+ * ada — pasien boleh tetap remisi meski komplemennya rendah.
+ */
+export const SLEDAI_SEROLOGI: ReadonlySet<string> = new Set(['komplemen_rendah', 'dna_meningkat']);
+
+/**
+ * Organ mayor menurut LLDAS: ginjal, SSP, kardiopulmoner, vaskulitis, demam.
+ *
+ * Ditulis sebagai daftar kunci eksplisit, bukan diturunkan dari `kelompok`:
+ * `kelompok` adalah pengelompokan TAMPILAN dan boleh diatur ulang kapan saja,
+ * sedangkan daftar ini menentukan apakah seorang pasien memenuhi LLDAS. Dua hal
+ * yang tidak boleh saling menumpang.
+ *
+ * Dua butir lain dalam definisi LLDAS — anemia hemolitik dan aktivitas
+ * gastrointestinal — memang tidak punya deskriptor di SLEDAI-2K, jadi tidak
+ * ada yang bisa diperiksa dari sini. Lihat catatan di `lib/target.ts`.
+ */
+export const SLEDAI_ORGAN_MAYOR: ReadonlySet<string> = new Set([
+  // SSP
+  'kejang',
+  'psikosis',
+  'sindrom_otak_organik',
+  'gangguan_penglihatan',
+  'gangguan_saraf_kranial',
+  'nyeri_kepala_lupus',
+  'cva',
+  // Vaskulitis
+  'vaskulitis',
+  // Ginjal
+  'silinder_urin',
+  'hematuria',
+  'proteinuria',
+  'piuria',
+  // Kardiopulmoner
+  'pleuritis',
+  'perikarditis',
+  // Demam
+  'demam',
+]);
 
 /** Urutan kelompok saat ditampilkan; deskriptor berbobot besar lebih dulu. */
 export const SLEDAI_KELOMPOK = [

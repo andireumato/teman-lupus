@@ -28,6 +28,10 @@ export type Patient = {
   id: string;
   profile_id: string;
   doctor_id: string | null;
+  /** Diisi pasien sendiri. Usianya dihitung saat ditampilkan, tidak disimpan. */
+  tgl_lahir: string | null;
+  /** 'perempuan' | 'laki-laki'. Untuk keperluan epidemiologi. */
+  jenis_kelamin: string | null;
   tgl_diagnosis: string | null;
   klasifikasi: string | null;
   organ_terlibat: string[] | null;
@@ -42,6 +46,11 @@ export type Medication = {
   jadwal: string | null;
   /** Berapa kali diminum per hari (1–6). Lihat supabase/obat_frekuensi_dan_riwayat.sql. */
   frekuensi: number;
+  /**
+   * Jam minum per dosis, 'HH:MM' 24 jam, urut mengikuti `MedLog.slot`.
+   * Dasar pengingat — lihat supabase/pengingat_obat.sql. NULL = tanpa pengingat.
+   */
+  jam: string[] | null;
   /** Keadaan sekarang saja; riwayatnya ada di `medication_events`. */
   aktif: boolean;
   created_at: string;
@@ -137,9 +146,20 @@ export type SledaiAssessment = {
   patient_id: string;
   doctor_id: string | null;
   tanggal: string;
-  deskriptor: Record<string, boolean> | null;
+  /**
+   * Deskriptor yang dicentang. Baris yang dibuat aplikasi ini berbentuk
+   * objek; baris warisan prototipe web berbentuk LARIK LABEL. Selalu baca
+   * lewat `pisahkanDeskriptor()` — lihat catatannya di lib/sledai.ts.
+   */
+  deskriptor: Record<string, boolean> | string[] | null;
   total: number | null;
   kategori: string | null;
+  /** PGA skala 0–3. NULL = belum dinilai, bukan nol. DORIS & LLDAS. */
+  pga: number | null;
+  /** Glukokortikoid harian setara prednison, mg. NULL = belum dicatat. */
+  gc_mg: number | null;
+  /** Pernyataan dokter: imunosupresan/biologik pada dosis pemeliharaan stabil. */
+  terapi_stabil: boolean | null;
   created_at: string;
 };
 
@@ -207,8 +227,53 @@ export type Alert = {
   /** 'flare_darurat' | 'flare_mendesak' untuk peringatan dari Cek Flare. */
   jenis: string | null;
   pesan: string | null;
-  /** True bila dokter sudah menindaklanjutinya. */
+  /**
+   * True bila dokter sudah menindaklanjutinya.
+   *
+   * Rinciannya ada di `alert_tindak_lanjut`. Baris yang ditutup sebelum tabel
+   * itu ada punya `selesai = true` TANPA rincian — jangan anggap keduanya
+   * setara.
+   */
   selesai: boolean;
+  created_at: string;
+};
+
+/**
+ * Apa yang terjadi sesudah sebuah peringatan red-flag.
+ *
+ * Tabel terpisah, bukan kolom di `alerts`, karena `catatan` adalah catatan
+ * pribadi dokter dan RLS Postgres bekerja per-BARIS bukan per-KOLOM. Lihat
+ * supabase/tindak_lanjut_alert.sql.
+ */
+export type AlertTindakLanjut = {
+  id: string;
+  alert_id: string;
+  doctor_id: string;
+  /** Kode dari `TINDAKAN` di constants/tindak-lanjut.ts — apa yang dokter lakukan. */
+  tindakan: string;
+  /** Kode dari `KONDISI` — keadaan pasien saat dihubungi. */
+  kondisi: string;
+  /** Catatan pribadi dokter. TIDAK ikut ringkasan maupun ekspor penelitian. */
+  catatan: string | null;
+  /** Distempel server. Selisihnya terhadap `alerts.created_at` = jam respons. */
+  dibuat_pada: string;
+};
+
+/**
+ * LupusQoL — kualitas hidup khusus SLE, 34 butir dalam 8 domain.
+ *
+ * Skor domain SENGAJA tidak disimpan: ia turunan murni dari `jawaban`, dan
+ * menyimpan keduanya berarti keduanya bisa berselisih. Hitung dengan
+ * `skorLupusQol()` di lib/lupusqol.ts. Lihat supabase/lupusqol.sql.
+ */
+export type LupusQolAssessment = {
+  id: string;
+  patient_id: string;
+  tanggal: string;
+  /** Kunci butir → nilai 0-4, mis. `{ fisik_1: 3 }`. */
+  jawaban: Record<string, number> | null;
+  /** Butir yang ditandai "tidak berlaku" — hanya domain hubungan intim. */
+  tak_berlaku: string[] | null;
   created_at: string;
 };
 
@@ -232,6 +297,8 @@ export type Database = {
       sledai_assessments: Row<SledaiAssessment>;
       visits: Row<Visit>;
       alerts: Row<Alert>;
+      alert_tindak_lanjut: Row<AlertTindakLanjut>;
+      lupusqol_assessments: Row<LupusQolAssessment>;
       lab_results: Row<LabResult>;
       visit_questions: Row<VisitQuestion>;
       medication_events: Row<MedicationEvent>;
@@ -246,6 +313,54 @@ export type Database = {
       tautkan_dokter: {
         Args: { kode: string };
         Returns: { nama_dokter: string | null }[];
+      };
+      /**
+       * Dipanggil dokter untuk mengisi data klinis dasar pasiennya.
+       * `security definer` — lihat supabase/data_klinis_dasar.sql.
+       */
+      simpan_data_klinis: {
+        Args: {
+          p_patient_id: string;
+          p_tgl_diagnosis: string | null;
+          p_klasifikasi: string | null;
+          p_organ: string[];
+        };
+        Returns: undefined;
+      };
+      /**
+       * Dipanggil dokter untuk menutup peringatan red-flag.
+       *
+       * Menyimpan tindak lanjut DAN menandai `alerts.selesai` dalam satu
+       * transaksi — dua tulisan terpisah bisa gagal separuh dan meninggalkan
+       * peringatan yang sudah ditangani tapi masih menumpuk di kotak masuk.
+       * `security definer` — lihat supabase/tindak_lanjut_alert.sql.
+       */
+      /**
+       * Pratinjau apa yang akan hilang bila akun dihapus. Hanya membaca.
+       * `security definer` — lihat supabase/hapus_akun.sql.
+       */
+      pratinjau_hapus_akun: {
+        Args: Record<string, never>;
+        Returns: unknown;
+      };
+      /**
+       * Menghapus akun pemanggil beserta seluruh datanya, permanen.
+       *
+       * Satu `delete from auth.users`; rantai CASCADE yang mengerjakan sisanya.
+       * Untuk dokter, tautan pasien dilepas lebih dulu — data pasien TIDAK ikut.
+       */
+      hapus_akun_saya: {
+        Args: Record<string, never>;
+        Returns: undefined;
+      };
+      tutup_alert: {
+        Args: {
+          p_alert: string;
+          p_tindakan: string;
+          p_kondisi: string;
+          p_catatan: string | null;
+        };
+        Returns: undefined;
       };
     };
     Enums: { [_ in never]: never };

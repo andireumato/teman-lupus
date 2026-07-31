@@ -52,6 +52,91 @@ Diverifikasi lewat REST: kolomnya terbaca (HTTP 200) dan RLS `alerts` aktif —
 insert tanpa login ditolak `42501`. Jumlah barisnya sendiri tidak bisa dicek
 dari luar justru karena RLS menyembunyikannya dari pengguna anonim.
 
+Tabel `alert_tindak_lanjut` dan fungsi `tutup_alert`
+(`supabase/tindak_lanjut_alert.sql`) **sudah dipasang** 31 Juli 2026 lewat
+Dashboard SQL Editor. Diverifikasi lewat REST dengan anon key: tabelnya terbaca
+HTTP 200 (schema cache PostgREST segar), insert tanpa login ditolak `42501` oleh
+RLS, dan fungsinya menolak pemanggil tanpa login.
+
+**Temuan dari verifikasi itu:** `revoke all on function ... from public` TIDAK
+melakukan apa yang tampaknya dilakukan. Supabase memasang default privileges
+yang memberi `EXECUTE` secara EKSPLISIT kepada peran `anon` untuk setiap fungsi
+baru di skema `public`; mencabut dari pseudo-role `public` tidak menyentuh
+pemberian itu. Pemanggil dengan anon key terbukti BERHASIL menjalankan
+`tutup_alert` maupun `simpan_data_klinis` — keduanya menolak melakukan apa pun
+karena pemeriksaan `auth.uid()` manual di dalam badan fungsinya (jawabannya
+pesan buatan sendiri, bukan "permission denied"), jadi tidak ada data yang
+bocor. Tetap diperbaiki oleh `supabase/kunci_fungsi_dari_anon.sql`, karena
+ketiga fungsi itu `security definer` dan melewati RLS: berpagar satu lapis
+sementara kodenya mengaku dua lapis adalah cara paling mudah membuat orang
+berikutnya berhenti memeriksa.
+
+Catatan yang layak diingat: tindak lanjutnya ditaruh di **tabel sendiri**, bukan
+sebagai kolom tambahan di `alerts`. `catatan` adalah catatan pribadi dokter, dan
+RLS Postgres bekerja per-BARIS bukan per-KOLOM — menumpangkannya di baris
+peringatan berarti siapa pun yang boleh membaca peringatan ikut membaca
+catatannya. Kebijakan RLS `alerts` sendiri dibuat di luar repo ini dan tidak
+bisa diperiksa dari sini, jadi keamanannya sengaja dibuat tidak bergantung pada
+kebijakan yang tidak terlihat.
+
+Tabel `lupusqol_assessments` (`supabase/lupusqol.sql`) **BELUM dipasang**.
+Menjalankannya aman kapan saja — tetapi kuesionernya sendiri belum bisa dibuka
+sampai lisensi LupusQoL turun, lihat bagian di bawah.
+
+Fungsi `simpan_data_klinis` (`supabase/data_klinis_dasar.sql`) **sudah
+dipasang** 29 Juli 2026. Diverifikasi lewat REST: pemanggil tanpa login ditolak
+`42501`, dan penjaga tanggalnya menjawab `23514` untuk tanggal di masa depan.
+
+Kolom `patients.tgl_lahir` & `patients.jenis_kelamin`
+(`supabase/data_dasar_pasien.sql`) **sudah dipasang** 30 Juli 2026, lewat
+Supabase Management API (bukan Dashboard). Diverifikasi tiga lapis:
+`information_schema.columns` menampilkan kedua kolom, `pg_constraint`
+menampilkan kedua CHECK-nya, dan REST dengan anon key membacanya HTTP 200 —
+artinya schema cache PostgREST sudah ikut segar.
+
+Kalau kolomnya suatu saat hilang, layar `/profil` menampilkan pesan yang
+menyebut nama file SQL-nya, dan kartu "Lengkapi profilmu" di beranda tidak
+muncul — beranda sendiri tetap jalan. Kolom yang tidak ada muncul dengan dua
+wujud berbeda: `42703` dari Postgres saat membaca, `PGRST204` dari PostgREST
+saat menulis; `pesanGalat()` di `profil.tsx` menangkap keduanya.
+
+Catatan yang layak diingat: "tanggal lahir tidak boleh di masa depan" TIDAK
+bisa dijadikan CHECK constraint. Postgres menolak fungsi non-immutable seperti
+`current_date` di dalam constraint, jadi database hanya menjaga batas bawahnya
+(> 1900) dan pemeriksaan masa depan ada di `periksaTanggalLahir()`.
+
+Kolom `medications.jam` (`supabase/pengingat_obat.sql`) **sudah dipasang**
+30 Juli 2026 lewat Management API. Diverifikasi: kolomnya ada, CHECK-nya
+terpasang, dan ekspresinya diuji — `08:00,20:00` lolos sementara `25:00` dan
+`8:00` ditolak. REST dengan anon key membacanya HTTP 200.
+
+Catatan yang layak diingat: CHECK constraint **tidak boleh berisi subquery**,
+jadi validasi per elemen larik dilakukan dengan regex atas
+`array_to_string(jam, ',')` — `array_to_string` bersifat immutable, sehingga
+bentuk itu sah. Versi pertama berkas ini memakai `select ... generate_series`
+di dalam CHECK dan akan ditolak Postgres.
+
+**Pengingat obat butuh APK baru.** `expo-notifications` membawa kode native
+yang tidak ada di dev build lama, jadi saklar pengingat di layar Obat tidak
+akan berfungsi sampai APK-nya dibangun ulang:
+`eas build --profile development --platform android`.
+
+Empat baris `sledai_assessments` warisan prototipe web menyimpan `deskriptor`
+sebagai LARIK LABEL (`["Artritis", "Ruam"]`) alih-alih objek berkunci.
+**Sudah diperbaiki** 30 Juli 2026 dengan `supabase/perbaiki_deskriptor_lama.sql`,
+atas persetujuan. Diverifikasi sebelum dan sesudah: kelima baris kini berbentuk
+objek, `total` dan `kategori` tidak berubah, dan menghitung ulang bobot dari
+`deskriptor` menghasilkan angka yang sama persis dengan `total` tersimpan pada
+setiap baris. Nol baris tersisa berbentuk larik.
+
+Bentuk larik itu sempat menjatuhkan layar Ringkasan Pasien (`scoreSledai`
+melempar pada kunci asing) dan — lebih berbahaya — hampir membuat baris warisan
+terbaca KOSONG: `Object.entries(["Ruam"])` menghasilkan nilai berupa string,
+bukan `true`, sehingga penanganan naif akan melaporkan "remisi tercapai" untuk
+pasien vaskulitis. `pisahkanDeskriptor()` di `lib/sledai.ts` sekarang menangani
+kedua bentuk, dan tipenya dilebarkan jadi `Record<string, boolean> | string[]`
+supaya pemanggil tidak bisa mengasumsikan bentuknya.
+
 Skema obat diperbarui 27 Juli 2026 lewat Dashboard SQL Editor dengan isi
 `supabase/obat_frekuensi_dan_riwayat.sql`: kolom `medications.frekuensi` dan
 tabel `medication_events`. Diverifikasi lewat REST: keduanya terbaca (HTTP 200)
@@ -94,6 +179,14 @@ Bila suatu saat perlu menyiapkan project Supabase dari nol:
    - `supabase/sisi_dokter.sql`
    - `supabase/efek_samping.sql`
    - `supabase/alerts_kunjungan.sql`
+   - `supabase/data_klinis_dasar.sql`
+   - `supabase/data_dasar_pasien.sql`
+   - `supabase/pengingat_obat.sql`
+   - `supabase/tindak_lanjut_alert.sql`
+   - `supabase/kunci_fungsi_dari_anon.sql`
+   - `supabase/lupusqol.sql`
+   - `supabase/hapus_akun.sql`
+   - `supabase/target_doris_lldas.sql`
 3. Salin Project URL & anon key ke `.env`.
 
 ---
@@ -108,7 +201,7 @@ npm start                 # lalu tekan i (iOS) / a (Android), atau pindai QR den
 
 | Perintah            | Fungsi                                         |
 | ------------------- | ---------------------------------------------- |
-| `npm test`          | Unit test (red-flag, ringkasan, SLEDAI, MARS-5, UV, grafik, kode, tanggal) — 215 test |
+| `npm test`          | Unit test (red-flag, ringkasan, SLEDAI, MARS-5, UV, grafik, kode, tanggal, klinis, pengingat, target, csv, ekspor, base64, tindak lanjut, LupusQoL, hapus akun, tautan) — 462 test |
 | `npm run typecheck` | Cek tipe TypeScript                            |
 | `npm run lint`      | ESLint + Prettier                              |
 | `npm run format`    | Rapikan format kode                            |
@@ -132,16 +225,20 @@ src/
     mars.tsx              kuesioner MARS-5
     ringkasan.tsx         ringkasan pra-kunjungan (Bagian 8 spesifikasi)
     efek-samping.tsx      laporan efek samping obat oleh pasien
+    profil.tsx            profil pasien: nama, tanggal lahir, jenis kelamin, keluar
     dokter/               sisi dokter (hanya untuk role 'doctor')
       index.tsx           daftar pasien tertaut
       akun.tsx            kode dokter & keluar
       peringatan.tsx      kotak masuk peringatan Cek Flare
+      ekspor.tsx          ekspor CSV untuk penelitian (tanpa nama, berkode)
       pasien/[id].tsx     ringkasan pra-kunjungan satu pasien
-      sledai/[id].tsx     formulir SLEDAI-2K
+      sledai/[id].tsx     formulir SLEDAI-2K (24 deskriptor)
+      target/[id].tsx     DORIS 2021 & LLDAS: PGA, dosis steroid, kestabilan terapi
+      klinis/[id].tsx     data klinis dasar pasien (diisi dokter)
     (tabs)/
       index.tsx           Beranda
       flare.tsx           Cek Flare (triase tanda bahaya)
-      obat.tsx            Obat & kepatuhan
+      obat.tsx            Obat & kepatuhan (+ jam minum & saklar pengingat)
       lab.tsx             Hasil laboratorium
       tren.tsx            Grafik, riwayat, akun
   lib/
@@ -160,7 +257,10 @@ src/
   constants/
     lupus.ts              gejala per sistem organ, panel lab & nilai rujukan
     sledai.ts             24 deskriptor SLEDAI-2K + bobotnya
-    efek-samping.ts       daftar efek samping obat [DRAF, perlu review]
+    efek-samping.ts       daftar efek samping obat [disahkan 30 Jul 2026]
+    klinis.ts             kriteria klasifikasi + domain organ [disahkan 31 Jul 2026]
+    lupusqol.ts           struktur LupusQoL [TANPA teks butir — berhak cipta]
+    tindak-lanjut.ts      dua sumbu tindak lanjut peringatan red-flag
     edukasi.ts            kutipan harian + tips lupus
     consent.ts            naskah informed consent + versinya
     brand.ts              palet warna
@@ -341,10 +441,10 @@ keduanya juga bisa jadi tanda bahaya. Aplikasi **tidak** mengeskalasi sendiri:
 ia hanya menampilkan pesan yang mengarahkan pasien ke Cek Flare, tetap satu-
 satunya jalur eskalasi.
 
-> ⚠️ **Daftar 16 efek sampingnya masih DRAF** (`constants/efek-samping.ts`),
-> disusun dari efek samping yang lazim pada hidroksiklorokuin, steroid,
-> mikofenolat, azatioprin, dan metotreksat. Menambah, membuang, atau mengubah
-> kata-katanya adalah keputusan reumatolog.
+> ✅ **Daftar 16 efek sampingnya sudah disahkan** reumatolog penanggung jawab
+> (30 Juli 2026), diterima apa adanya tanpa perubahan. Semula disusun dari efek
+> samping yang lazim pada hidroksiklorokuin, steroid, mikofenolat, azatioprin,
+> dan metotreksat. Perubahan berikutnya tetap keputusan reumatolog.
 
 ### Grafik di layar Tren
 
@@ -574,14 +674,374 @@ definisi itulah yang menentukan boleh atau tidaknya sesuatu dicentang, dan
 tanpa itu penilai hanya menebak dari judulnya. Dijaga test: tiap deskriptor
 wajib punya definisi.
 
-> ⚠️ Masih perlu disahkan reumatolog:
-> - **Definisi 24 deskriptor** — ini ditulis dari pengetahuan baku SLEDAI
->   (Bombardier dkk. 1992) dan **belum dicocokkan kata-per-kata** dengan naskah
->   aslinya; tabel definisinya ada di lampiran yang tidak tersedia sebagai teks
->   akses terbuka. Berbeda dengan struktur, bobot, dan kategori di atas, yang
->   memang dicocokkan ke sumber yang bisa dibaca.
-> - **Terjemahan Indonesia** tiap deskriptor.
+> ✅ **Disahkan reumatolog penanggung jawab, 30 Juli 2026**: 24 definisi
+> deskriptor beserta kata-kata Indonesianya, diterima apa adanya.
+>
+> ✅ **Ditelusuri ke literatur, 30 Juli 2026**, karena aplikasi akan dipakai
+> untuk penelitian. Dicocokkan dengan Tabel I Suszek dkk. 2024 (PMC11267658):
+> 20 cocok penuh, 4 ditandai berbeda — dan keempatnya ternyata akibat tabel
+> Suszek yang meringkas, bukan salah di sisi kita. Yang paling berarti:
+> **artritis**. Suszek menulis "≥ 2 joints", kita "lebih dari 2 sendi"; sumber
+> kedua (Quimby dkk. 2013, PMC3824559) mengutip naskah aslinya "More than 2
+> joints with pain and signs of inflammation" — versi kita yang benar. Pasien
+> dengan tepat 2 sendi radang mendapat 0 pada satu bacaan dan 4 pada bacaan
+> lain.
+>
+> ⚠️ **Jendela waktu diperbaiki 30 Juli 2026: 30 hari → 10 hari.** Wang dkk.
+> 2019 (PMC6735177) menyebut instrumennya SLEDAI-2K lalu menulis "present at
+> the time of the visit or in the preceding 10 days", tanpa menyebut 30 hari.
+> Angka 30 sebelumnya diambil dari batas atas rentang "10-30 days" pada Suszek
+> tanpa dasar lebih jauh. Sebagian penerapan memang memakai 30 hari — protokol
+> penelitian wajib menyebut yang mana.
+>
+> ⚠️ Yang tetap terbuka:
+> - Naskah asli **Bombardier dkk. 1992** tidak tersedia sebagai teks akses
+>   terbuka, jadi penelusuran ini bersandar pada reproduksi pihak ketiga.
 > - Apakah potongan kategori Carter cocok dengan protokol penelitian Anda.
+
+---
+
+## Target terapi — DORIS 2021 & LLDAS
+
+`src/lib/target.ts`, murni dan teruji seperti `redflag.ts`. Keduanya adalah
+titik akhir yang dilaporkan dalam penelitian, bukan sekadar tampilan.
+
+| | DORIS 2021 (remisi) | LLDAS (aktivitas rendah) |
+| --- | --- | --- |
+| Skor | clinical SLEDAI-2K = 0 | SLEDAI-2K ≤ 4, tanpa aktivitas organ mayor |
+| PGA (0–3) | < 0,5 | ≤ 1 |
+| Glukokortikoid | ≤ 5 mg/hari | ≤ 7,5 mg/hari |
+| Terapi | imunosupresan & biologik dosis stabil | dosis pemeliharaan standar yang ditoleransi |
+| Lain | aktivitas serologis boleh ada | tidak ada aktivitas lupus baru sejak kunjungan lalu |
+
+Rujukan: van Vollenhoven dkk. Lupus Sci Med 2021 (PMID 34819388) untuk DORIS;
+kriteria operasional LLDAS dikutip lewat Parra Sánchez dkk. Rheumatol Ther 2023
+(PMID 37798595, akses terbuka) yang memuat keduanya dalam satu tabel;
+hubungannya dengan berkurangnya akrual kerusakan organ pada Ugarte-Gil dkk.
+Ann Rheum Dis 2022 (PMID 35944946).
+
+**Dipisah dari formulir SLEDAI-2K, tetapi memperbarui baris yang sama.** PGA,
+dosis steroid, dan kestabilan terapi adalah kolom pada `sledai_assessments`,
+bukan tabel tersendiri — ketiganya tidak punya arti lepas dari skor kunjungan
+itu. Konsekuensinya ada urutan yang wajib: SLEDAI-2K dulu, baru target. Layar
+target mengatakannya terus terang alih-alih membuat baris baru tanpa
+deskriptor, yang akan terbaca sebagai "tidak ada aktivitas" dan melaporkan
+remisi palsu.
+
+Tiga keputusan lain yang layak diingat:
+
+**"Belum bisa dinilai" bukan "tidak tercapai".** PGA, dosis steroid, dan
+pernyataan kestabilan terapi bisa kosong. Menyamakan data yang belum lengkap
+dengan target yang gagal akan meremehkan angka pencapaian di seluruh kohort.
+Tetapi syarat yang sudah PASTI gagal tetap menang: cSLEDAI-2K 8 tidak akan
+memenuhi DORIS berapa pun PGA-nya.
+
+**Dosis steroid dicatat di baris penilaian, bukan dihitung dari daftar obat.**
+Definisinya menuntut dosis saat penilaian; `medications.dosis` teks bebas; dan
+menghitungnya berarti aplikasi melakukan konversi setara-prednison, yaitu
+perhitungan klinis yang tidak boleh disembunyikan di dalam kode.
+
+**Dua butir LLDAS tidak bisa diperiksa** — anemia hemolitik dan aktivitas
+gastrointestinal tidak punya deskriptor di SLEDAI-2K. "Tercapai" di aplikasi
+berarti "tercapai sejauh yang terlihat dari SLEDAI-2K", dan itu ditulis di
+layarnya.
+
+**Penilaian LAMA bisa dilengkapi** (31 Juli 2026). Semula layar ini hanya bisa
+mengisi penilaian terbaru, sehingga PGA dan dosis steroid pada kunjungan yang
+sudah lewat tidak akan pernah terisi. Sekarang ada pemilih penilaian, dengan
+lencana lengkap/sebagian/belum diisi supaya yang tertinggal langsung terlihat.
+
+Dua hal ikut berubah dan keduanya jenis kesalahan yang TIDAK memunculkan galat:
+
+1. **Pembanding LLDAS mengikuti penilaian yang dipilih.** Syarat "tidak ada
+   aktivitas baru" harus dibandingkan dengan tetangga yang benar; memakai baris
+   kedua apa adanya hanya benar saat mengedit yang terbaru, dan salah pembanding
+   diam-diam menjawab tercapai/tidak untuk kunjungan yang keliru.
+   `penilaianSebelum()` di `lib/target.ts` menanganinya, dengan urutan yang
+   diputus `created_at` lalu `id` supaya tanggal kembar tidak menghasilkan
+   pembanding yang berpindah-pindah antar pemuatan.
+
+2. **Satu baris diambil melebihi yang ditampilkan** (`AMBIL = BATAS + 1`).
+   Penilaian tertua yang tampil tetap butuh tetangganya. Tanpa baris tambahan
+   itu, pembandingnya `null` — yang berarti "tanpa pembanding" dan membuat
+   syaratnya lolos otomatis, padahal pembandingnya ada dan hanya tidak ikut
+   terambil.
+
+Perubahan yang belum disimpan menahan perpindahan baris, dengan pilihan simpan
+dulu atau buang. Status "belum disimpan" dibandingkan dari NILAI hasil baca,
+bukan teksnya: papan ketik Indonesia memberi koma, "0,5" tersimpan sebagai 0.5,
+dan perbandingan teks akan selamanya menganggapnya belum tersimpan.
+
+---
+
+## Ekspor CSV untuk penelitian
+
+`src/lib/csv.ts` (penulisan) dan `src/lib/ekspor.ts` (perakitan tabel), keduanya
+murni dan teruji; `app/dokter/ekspor.tsx` hanya mengambil data, mengemas jadi
+satu zip, dan membagikan.
+
+Dua belas berkas: `pasien`, `sledai`, `checkin`, `gejala`, `obat`, `dosis`,
+`efek_samping`, `mars`, `cek_flare`, `lab`, `kunjungan`, dan `keterangan`.
+Semuanya selalu ada meski kosong — berkas yang hilang tidak bisa dibedakan dari
+ekspor yang gagal separuh.
+
+### Privasi — keputusan yang dipegang
+
+**Tanpa nama.** Pasien diwakili `kode` = delapan karakter pertama UUID-nya,
+kode yang sama dengan yang sudah tampil di kepala ringkasan pra-kunjungan.
+Konsistensinya bukan janji melainkan akibat: diturunkan dari id yang tidak
+pernah berubah, tanpa tabel pemetaan terpisah yang bisa hilang atau meleset.
+
+**Tanpa tanggal lahir dan tanggal diagnosis** — yang diekspor usia dalam tahun
+dan lama sakit dalam bulan. Keduanya pengenal semu yang, digabung dengan jenis
+kelamin dan tanggal kunjungan, bisa mempersempit identitas seseorang.
+
+**Tanpa teks bebas** — catatan check-in, alasan tidak minum obat, dan
+pertanyaan pasien tidak ikut; isinya sering menyebut nama orang dan tempat.
+Yang diekspor hanya penandanya (`ada_catatan`) supaya kelengkapan data tetap
+bisa dihitung.
+
+### Yang mudah salah, dan dijaga test
+
+**Suntikan rumus.** Sel yang diawali `=`, `+`, `-`, atau `@` dijalankan Excel
+dan LibreOffice sebagai RUMUS. Nama obat dan catatan diketik bebas, jadi ini
+bukan kemungkinan teoretis; isinya diawali kutip tunggal.
+
+**Pelolosan.** Satu koma di dalam catatan menggeser seluruh kolom. Ada test
+yang memastikan jumlah kolom tiap baris selalu sama dengan judulnya.
+
+**BOM UTF-8 + CRLF + desimal titik.** Tanpa BOM, Excel merusak huruf non-ASCII.
+Desimal titik dan pemisah koma adalah CSV baku — langsung terbaca R, pandas,
+SPSS. Excel berlokal Indonesia perlu Data → From Text/CSV.
+
+**Pembanding LLDAS tidak bocor antar pasien.** Penilaian dipasangkan dengan
+yang sebelumnya MILIK PASIEN YANG SAMA; penilaian pertama tiap pasien mendapat
+`null` (tanpa pembanding), bukan `undefined` (belum diambil).
+
+**Modul native yang belum tentu ada.** `expo-sharing` memanggil
+`requireNativeModule('ExpoSharing')` di baris paling atas modulnya — ia melempar
+saat modulnya DIEVALUASI, bukan saat fungsinya dipanggil. `import` biasa berarti
+APK lama merobohkan seluruh layar (render error) sebelum komponennya sempat ada,
+sehingga try/catch di dalam komponen tidak pernah kebagian jalan. Karena itu ia
+dimuat malas lewat `require()` di dalam try/catch.
+
+Bandingkan `expo-file-system/legacy`, yang boleh diimpor biasa karena memakai
+`requireOptionalNativeModule` dan jatuh ke shim, bukan melempar.
+
+**Dua jalan keluar.** Bila `expo-sharing` ada → share sheet. Bila tidak →
+Storage Access Framework: dokter memilih folder sendiri, dan zip ditulis sebagai
+base64. SAF menumpang `ExponentFileSystem` di dalam `expo-file-system`, yang
+selalu ikut terpasang karena `expo` sendiri bergantung padanya — jadi ekspor
+tetap jalan di APK yang dibangun sebelum `expo-sharing` ditambahkan.
+
+**Base64 ditulis sendiri** (`src/lib/base64.ts`). Hermes tidak menyediakan
+`btoa`, `Buffer`, maupun `TextEncoder`. Padding-nya diuji silang terhadap
+`Buffer` Node untuk setiap sisa panjang — satu byte salah menghasilkan zip rusak
+yang baru ketahuan di komputer, jauh dari tempat kesalahannya.
+
+**Tidak menulis apa pun sebelum izin diberikan.** Kalau dokter membatalkan
+pemilihan folder, tidak ada zip berisi data kesehatan yang tertinggal di
+penyimpanan aplikasi.
+
+---
+
+## LupusQoL — PRO kualitas hidup
+
+Instrumen PRO yang dipilih: **LupusQoL**, khusus SLE, 34 butir dalam 8 domain,
+periode ingat 4 minggu, skor domain 0–100 (**makin tinggi makin baik** —
+kebalikan dari SLEDAI-2K).
+
+Versi Indonesia tervalidasi: **Anindito B, Hidayat R, Koesnoe S, Dewianty E.**
+*Validity and reliability of lupus quality of life questionnaire in patients
+with systemic lupus erythematosus in Indonesia.* Indonesian Journal of
+Rheumatology 2016;8(2):38–44. Dipakai kelompok FKUI/Cipto Mangunkusumo
+(PMID 40148993).
+
+### ⚠️ Berhak cipta — teks butirnya sengaja TIDAK ada di repo ini
+
+Pemilik: University of Central Lancashire dan East Lancashire Hospitals NHS
+Trust. Lisensi lewat RWS Life Sciences (`LupusQoL@rws.com`). Ketentuannya:
+*"may not be reproduced or translated in whole or in part without the express
+written permission of the copyright holder."* **Gratis untuk peneliti akademik**,
+tetapi izin tertulis tetap wajib.
+
+Karena itu `constants/lupusqol.ts` hanya memuat METADATA yang sudah terbit di
+literatur — jumlah domain, jumlah butir per domain, rentang skala, aturan skor.
+`TEKS_BUTIR` dan `TEKS_PILIHAN` sengaja dibiarkan kosong.
+
+**Mengaktifkannya:** isi kedua konstanta itu dengan naskah resmi LupusQoL-ID.
+Tidak ada berkas lain yang perlu disentuh — `naskahTerpasang()` otomatis
+menghidupkan layar pengisian dan memunculkan tautannya di tab Tren. Satu test
+(`naskah resminya BELUM terpasang`) sengaja dibuat gagal saat itu terjadi,
+sebagai pengingat mengubah harapannya jadi `true`.
+
+Dua hal yang perlu ikut ditanyakan saat meminta izin:
+
+1. **Bahasa Indonesia tidak tercantum** di 77 bahasa/51 negara yang terdaftar di
+   RWS. Validasi Anindito 2016 tampaknya terjemahan akademik independen, bukan
+   yang teregistrasi pada pemegang hak cipta.
+2. **Versi aslinya divalidasi untuk KERTAS.** Pemberian lewat layar adalah
+   adaptasi cara pemberian dan perlu dibicarakan terpisah.
+
+### Keputusan skoring yang dijaga test
+
+**Butir kosong dikeluarkan dari rata-rata, tidak dianggap nol.** Nol berarti
+kualitas hidup terburuk; menganggap pertanyaan yang tak dijawab sebagai nol
+melaporkan penderitaan yang tidak pernah dilaporkan pasien.
+
+**Rerata dihitung antar DOMAIN, bukan antar butir.** Per butir, domain fisik
+(8 butir) berbobot empat kali domain hubungan intim (2 butir) tanpa dasar apa
+pun. Instrumen aslinya sendiri TIDAK mendefinisikan skor total — angka rerata di
+aplikasi ini kemudahan tampilan, bukan keluaran baku, dan tidak diekspor.
+
+**Skor tidak disimpan di database, hanya jawabannya.** Skor turunan murni dari
+jawaban; menyimpan keduanya berarti keduanya bisa berselisih — persis yang
+terjadi pada baris `sledai_assessments` warisan prototipe web.
+
+**Ambang minimal butir per domain sengaja TIDAK diputuskan.** Manual resmi
+LupusQoL tidak bisa diakses saat ini, jadi ekspor menyertakan kolom
+`<domain>_terjawab` dan membiarkan aturan data hilang di tangan peneliti.
+Tanpa penyebut itu, skor 100 dari satu butir tak bisa dibedakan dari 100 dari
+delapan butir.
+
+---
+
+## Hapus akun
+
+Dua alasan wajib: hak penghapusan data pribadi di **UU PDP 27/2022** (data
+kesehatan tergolong data pribadi spesifik), dan syarat **Google Play** bahwa
+aplikasi dengan pendaftaran akun harus menyediakan penghapusan akun beserta
+seluruh datanya — bukan sekadar membekukan.
+
+### Rantai penghapusan
+
+Diperiksa langsung dari `pg_constraint` 31 Juli 2026:
+
+```
+auth.users --CASCADE--> profiles --CASCADE--> patients --CASCADE--> 13 tabel
+```
+
+Tiga belas tabel: `daily_checkins`, `medications`, `med_logs`,
+`med_side_effects`, `medication_events`, `mars_assessments`, `flare_checks`,
+`lab_results`, `sledai_assessments`, `visits`, `visit_questions`, `alerts`,
+`lupusqol_assessments`. `alert_tindak_lanjut` ikut lewat CASCADE dari `alerts`.
+
+Untuk pasien cukup **satu baris** `delete from auth.users`. Menghapus tabel satu
+per satu dari aplikasi justru berbahaya: daftarnya akan basi diam-diam setiap
+kali ada tabel baru, dan yang tertinggal adalah data kesehatan yang mestinya
+sudah hilang.
+
+### Dokter berbeda, dan bukan karena sopan santun
+
+`patients.doctor_id`, `sledai_assessments.doctor_id`, dan `visits.doctor_id`
+ketiganya **NO ACTION**. Tanpa dilepas lebih dulu, penghapusan akun dokter gagal
+dengan galat foreign key yang tidak berarti apa-apa bagi pemakainya. Dan secara
+isi: catatan itu milik pasien, bukan milik dokternya.
+
+Jadi `hapus_akun_saya()` mengosongkan ketiga kolom itu lebih dulu. Konsekuensi
+yang ditulis di layar sebelum dokter menyetujui: pasiennya terlepas dan harus
+menautkan diri ke dokter lain, dan kolom "diperiksa oleh" pada penilaian lama
+menjadi kosong. Kolom itu tidak ikut ekspor penelitian.
+
+`alert_tindak_lanjut.doctor_id` sengaja dibiarkan — kolomnya `not null` dan
+tanpa foreign key, jadi tidak memblokir apa pun. Yang tertinggal hanya UUID
+tanpa baris profil untuk menerjemahkannya: jejak audit yang sudah tidak bisa
+ditautkan kembali ke seseorang.
+
+### Tiga penahan agar tidak terpencet tak sengaja
+
+1. Layar terpisah, dan kartunya di Profil sengaja **tidak** bersebelahan dengan
+   "Keluar" — keduanya sekilas terbaca mirip, dan yang satu tidak bisa
+   dibatalkan.
+2. Rincian berisi **angka** dari `pratinjau_hapus_akun()` — apa persisnya yang
+   hilang, bukan peringatan umum.
+3. Kata `HAPUS` harus diketik huruf besar. Spasi di ujung dimaafkan, huruf kecil
+   tidak.
+
+### Yang dijaga test
+
+**Kunci tak dikenal tidak ditampilkan mentah, tapi tetap ikut total.** Fungsi
+database bisa menambah tabel sebelum `lib/hapus-akun.ts` menyusul; menampilkan
+`tabel_baru: 5` kepada pasien lebih buruk daripada tidak menampilkannya, tetapi
+total yang kurang 5 adalah kebohongan.
+
+**Pratinjau dihitung dengan SQL dinamis dan disaring `to_regclass`.** Tidak semua
+project sudah menjalankan setiap skrip migrasi, dan pratinjau yang meledak
+karena satu tabel belum ada akan memblokir hak yang justru dijamin
+undang-undang.
+
+**Akun kosong punya kalimatnya sendiri.** Tanpa itu bunyinya "0 catatan akan
+dihapus permanen".
+
+**Sesi lokal dibersihkan meski `signOut` server menolak.** Akunnya memang sudah
+tidak ada; kalau token lokal tertinggal, aplikasi terbuka dengan sesi milik akun
+yang lenyap dan setiap layar gagal tanpa penjelasan.
+
+### Yang masih kurang untuk Google Play
+
+Play juga menuntut jalur penghapusan **di luar aplikasi** — sebuah URL web yang
+bisa dibuka tanpa memasang aplikasinya. Itu belum ada dan tidak bisa dibuat dari
+repo ini saja.
+
+---
+
+## Halaman web pendamping (`docs/`)
+
+Dua halaman statis, tanpa dependensi apa pun, siap dipasang di GitHub Pages
+(Settings → Pages → Deploy from a branch → `main` → `/docs`):
+
+| Berkas | Isi |
+|---|---|
+| `docs/index.html` | Kebijakan privasi |
+| `docs/hapus-akun.html` | Permintaan hapus akun untuk yang tidak bisa membuka aplikasi |
+
+Keduanya wajib bagi Google Play. Isinya diturunkan dari kode, bukan template —
+setiap klaim di dalamnya bisa ditelusuri ke berkas yang bersangkutan.
+
+Setelah di-hosting, isi `URL_SITUS` di `src/constants/tautan.ts`. Tautannya
+muncul sendiri di layar Profil, dan satu test (`BELUM dipasang`) sengaja gagal
+saat itu terjadi sebagai pengingat mendaftarkan URL yang sama di Play Console.
+Play menuntut URL yang **sama persis** di tiga tempat — Play Console, di dalam
+aplikasi, dan di situsnya — jadi ketiganya diturunkan dari satu konstanta.
+
+### Temuan saat menulisnya: satu pernyataan yang tidak benar
+
+String izin lokasi di `app.json` semula berbunyi *"Lokasi tidak dikirim ke
+server dan tidak disimpan bersama data medismu."*
+
+Bagian kedua benar, bagian pertama **tidak**. `src/lib/uv.ts` mengirim koordinat
+ke `https://api.open-meteo.com/v1/forecast` untuk menanyakan indeks UV. Itu
+server pihak ketiga. Yang benar: koordinatnya tidak dikirim ke server *kami* dan
+tidak disimpan di mana pun.
+
+Sudah diperbaiki di `app.json`. Naskah persetujuan juga ikut: paragraf
+**"Lokasi & layanan luar"** ditambahkan dan `CONSENT_VERSION` dinaikkan
+`2026-07-03` → `2026-07-31`, karena naskah lama tidak menyebut Open-Meteo
+maupun bahwa data disimpan di Singapura. Menaikkan versi membuat semua pasien
+diminta menyetujui ulang — mekanismenya sudah ada (`consentValid` di
+`lib/session.tsx` membandingkan versi, dan layar consent menampilkan pesan
+"naskah telah diperbarui"). Dilakukan sekarang justru karena etiknya belum
+keluar dan belum ada pasien sungguhan yang menyetujui naskah yang kurang.
+
+Yang sebenarnya terjadi, untuk rujukan:
+
+- Ketelitian rendah (`Location.Accuracy.Low`, sekitar 1 km)
+- Dikirim ke Open-Meteo tanpa nama, email, atau pengenal apa pun
+- Tidak disimpan — tidak di ponsel, tidak di Supabase
+- Izin boleh ditolak; aplikasi memakai koordinat RSUP H. Adam Malik sebagai
+  perkiraan dan tetap berfungsi penuh
+
+### Yang diverifikasi sebelum menulis kebijakannya
+
+Diperiksa langsung di kode, bukan diasumsikan:
+
+- **Tidak ada analitik, pelacak, SDK iklan, atau crash reporter** apa pun
+- **Foto tidak pernah diunggah** — kolom `daily_checkins.foto_url` ada sejak
+  prototipe web tetapi tidak ada kode yang mengisinya
+- **Pengingat obat murni lokal** (`scheduleNotificationAsync`) — tidak ada push
+  token, tidak ada server notifikasi
+- Hanya dua pihak ketiga: Supabase (penyimpanan, region Singapura
+  `ap-southeast-1`) dan Open-Meteo (koordinat saja)
 
 ---
 
@@ -643,6 +1103,10 @@ aplikasi ini:
 | `sisi_dokter.sql`             | Kode dokter, fungsi penautan, RLS akses profil                  |
 | `efek_samping.sql`            | Tabel efek samping obat yang dilaporkan pasien                   |
 | `alerts_kunjungan.sql`        | Trigger peringatan dari Cek Flare + tautan ke cek flare asalnya  |
+| `data_klinis_dasar.sql`       | Fungsi `simpan_data_klinis` — dokter mengisi tgl diagnosis, klasifikasi, organ terlibat |
+| `data_dasar_pasien.sql`       | `patients.tgl_lahir` & `patients.jenis_kelamin`, diisi pasien di `/profil` |
+| `pengingat_obat.sql`          | `medications.jam` — jam minum per dosis, dasar pengingat notifikasi |
+| `target_doris_lldas.sql`      | `sledai_assessments.pga`, `gc_mg`, `terapi_stabil` — dasar DORIS 2021 & LLDAS |
 
 Semuanya aman dijalankan ulang. `unique_checkin_per_hari.sql` berisi query untuk
 memeriksa duplikat lebih dulu — baca komentarnya sebelum menjalankan.
@@ -662,14 +1126,8 @@ menyetujui ulang. Ini syarat audit etik.
 
 ## Yang belum ada
 
-- **Sisi dokter**: daftar pasien, input SLEDAI, alerts, ringkasan pra-kunjungan.
-  Tabel `sledai_assessments`, `visits`, dan `alerts` sudah ada di skema tetapi
-  belum dipakai. Pengguna dengan peran `doctor` saat ini masuk ke tampilan yang
-  sama dengan pasien.
 - **Tindak lanjut sesudah peringatan red-flag** — tidak ada layar yang bertanya
   "apa yang kamu lakukan setelah itu?", jadi bagian 5 ringkasan selalu berkata
   belum tercatat.
-- **Pengingat obat** & notifikasi.
-- **Ekspor CSV** untuk penelitian.
 - **PRO tervalidasi Bahasa Indonesia** (mis. Lupus Impact Tracker) — lihat
   catatan validasi di Bagian 7 spesifikasi MVP.

@@ -2,19 +2,10 @@ import { useCallback, useState } from 'react';
 import { Link, useFocusEffect } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { DokterSaya } from '@/components/dokter-saya';
-import {
-  Card,
-  Disclaimer,
-  GhostButton,
-  InfoBar,
-  Loading,
-  Msg,
-  Screen,
-  SectionLabel,
-} from '@/components/ui/kit';
+import { Card, Disclaimer, InfoBar, Loading, Msg, Screen, SectionLabel } from '@/components/ui/kit';
 import { Brand, radius, space } from '@/constants/brand';
 import { DISCLAIMER } from '@/constants/consent';
+import { naskahTerpasang } from '@/constants/lupusqol';
 import { deretHari, hitungStreak, mundurHari, tanggalPendek, todayISO } from '@/lib/dates';
 import { ruasGrafik, titikGrafik } from '@/lib/grafik';
 import { useSession } from '@/lib/session';
@@ -124,7 +115,7 @@ const LABEL_FLARE: Record<string, string> = {
 };
 
 export default function TrenScreen() {
-  const { patientId, profile, signOut } = useSession();
+  const { patientId } = useSession();
   const [loading, setLoading] = useState(true);
   const [checkins, setCheckins] = useState<DailyCheckin[]>([]);
   const [mars, setMars] = useState<MarsAssessment[]>([]);
@@ -278,6 +269,21 @@ export default function TrenScreen() {
         )}
       </Card>
 
+      {/* Muncul sendiri begitu naskah resmi LupusQoL dipasang di
+          constants/lupusqol.ts. Disembunyikan sampai saat itu karena tautan
+          yang hanya berujung pada penjelasan lisensi tidak ada gunanya bagi
+          pasien. */}
+      {naskahTerpasang() && (
+        <Link href="/lupusqol" asChild>
+          <Pressable style={styles.ringkasanCard}>
+            <Text style={styles.ringkasanJudul}>Kualitas hidup (LupusQoL)</Text>
+            <Text style={styles.ringkasanSub}>
+              34 pertanyaan tentang 4 minggu terakhir. Diisi berkala, bukan harian.
+            </Text>
+          </Pressable>
+        </Link>
+      )}
+
       <Link href="/ringkasan" asChild>
         <Pressable style={styles.ringkasanCard}>
           <Text style={styles.ringkasanJudul}>Ringkasan pra-kunjungan</Text>
@@ -287,15 +293,17 @@ export default function TrenScreen() {
         </Pressable>
       </Link>
 
-      <DokterSaya patientId={patientId} />
-
-      <Card>
-        <SectionLabel>Akun</SectionLabel>
-        <Text style={styles.akun}>
-          {profile?.nama ?? '—'} · {profile?.role === 'doctor' ? 'Dokter' : 'Pasien'}
-        </Text>
-        <GhostButton label="Keluar" onPress={() => void signOut()} />
-      </Card>
+      {/* "Dokter Saya" dan tombol Keluar pindah ke `/profil` 30 Juli 2026.
+          Keduanya urusan akun, bukan tren — dan begitu ada layar Profil,
+          dua tempat berbeda untuk keluar hanya membingungkan. */}
+      <Link href="/profil" asChild>
+        <Pressable style={styles.ringkasanCard}>
+          <Text style={styles.ringkasanJudul}>Profil saya</Text>
+          <Text style={styles.ringkasanSub}>
+            Nama, tanggal lahir, dokter yang menangani, dan tombol keluar.
+          </Text>
+        </Pressable>
+      </Link>
 
       <Disclaimer>{DISCLAIMER}</Disclaimer>
     </Screen>
