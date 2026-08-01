@@ -1237,3 +1237,147 @@ describe('gejala di luar organ terlibat yang tercatat', () => {
     );
   });
 });
+
+// ---------- 2b. Gejala yang berhenti dilaporkan ----------
+
+describe('gejala yang berhenti dilaporkan', () => {
+  /** Check-in tanpa gejala apa pun pada tanggal tertentu. */
+  const kosong = (tanggal: string) => checkin({ tanggal, gejala: [] });
+  /** Check-in dengan satu gejala. */
+  const dengan = (tanggal: string, system: string, item: string) =>
+    checkin({ tanggal, gejala: [{ system, item, present: true }] });
+
+  const cari = (r: ReturnType<typeof buatRingkasan>, item: string) =>
+    [...r.gejala.baru, ...r.gejala.memburuk, ...r.gejala.menetap, ...r.gejala.membaik].find(
+      (g) => g.item === item
+    );
+
+  it('gejala paruh kedua yang berhenti masuk Berkurang, bukan Baru muncul', () => {
+    // Inilah cacatnya: `h.awal === 0` diperiksa sebelum perbandingan frekuensi,
+    // sehingga gejala yang pertama muncul di paruh kedua tidak pernah bisa
+    // keluar dari "Baru muncul" berapa lama pun sudah berhenti.
+    const r = buatRingkasan(
+      input({
+        checkins: [
+          kosong('2026-07-05'),
+          kosong('2026-07-10'),
+          dengan('2026-07-18', 'kulit', 'Ruam'),
+          kosong('2026-07-22'),
+          kosong('2026-07-25'),
+          kosong('2026-07-28'),
+          kosong('2026-07-30'),
+        ],
+      })
+    );
+    expect(r.gejala.baru.map((g) => g.item)).not.toContain('Ruam');
+    expect(r.gejala.membaik.map((g) => g.item)).toContain('Ruam');
+  });
+
+  it('gejala paruh kedua yang MASIH dilaporkan tetap Baru muncul', () => {
+    const r = buatRingkasan(
+      input({
+        checkins: [
+          kosong('2026-07-05'),
+          kosong('2026-07-10'),
+          dengan('2026-07-29', 'konstitusional', 'Demam'),
+          dengan('2026-07-30', 'konstitusional', 'Demam'),
+        ],
+      })
+    );
+    expect(r.gejala.baru.map((g) => g.item)).toContain('Demam');
+  });
+
+  it('berhenti check-in TIDAK membuat gejala dianggap berkurang', () => {
+    // Tidak adanya data bukan tidak adanya gejala. Pasien yang berhenti
+    // mengisi harus tetap tampil dengan keluhan terakhirnya.
+    const r = buatRingkasan(
+      input({
+        checkins: [
+          kosong('2026-07-05'),
+          kosong('2026-07-10'),
+          dengan('2026-07-18', 'kulit', 'Ruam'),
+        ],
+      })
+    );
+    expect(r.gejala.membaik.map((g) => g.item)).not.toContain('Ruam');
+    expect(cari(r, 'Ruam')?.checkinSesudahnya).toBe(0);
+  });
+
+  it('butuh tiga check-in tanpa keluhan, dua belum cukup', () => {
+    // Ambang tiga menahan kategori berpindah-pindah antar-kunjungan tanpa
+    // sebab klinis.
+    const dua = buatRingkasan(
+      input({
+        checkins: [
+          kosong('2026-07-05'),
+          kosong('2026-07-10'),
+          dengan('2026-07-20', 'kulit', 'Ruam'),
+          kosong('2026-07-25'),
+          kosong('2026-07-28'),
+        ],
+      })
+    );
+    expect(dua.gejala.baru.map((g) => g.item)).toContain('Ruam');
+    expect(cari(dua, 'Ruam')?.checkinSesudahnya).toBe(2);
+  });
+
+  it('mencatat tanggal terakhir dilaporkan, bukan tanggal pertama', () => {
+    const r = buatRingkasan(
+      input({
+        checkins: [
+          dengan('2026-07-03', 'sendi', 'Nyeri sendi'),
+          dengan('2026-07-11', 'sendi', 'Nyeri sendi'),
+          dengan('2026-07-26', 'sendi', 'Nyeri sendi'),
+        ],
+      })
+    );
+    expect(cari(r, 'Nyeri sendi')?.terakhir).toBe('2026-07-26');
+  });
+
+  it('tanggal terakhir benar walau urutan barisnya acak', () => {
+    const r = buatRingkasan(
+      input({
+        checkins: [
+          dengan('2026-07-26', 'sendi', 'Nyeri sendi'),
+          dengan('2026-07-03', 'sendi', 'Nyeri sendi'),
+          dengan('2026-07-11', 'sendi', 'Nyeri sendi'),
+        ],
+      })
+    );
+    expect(cari(r, 'Nyeri sendi')?.terakhir).toBe('2026-07-26');
+  });
+
+  it('teksnya menyebut tanggal terakhir dan jumlah check-in sesudahnya', () => {
+    const teks = ringkasanTeks(
+      buatRingkasan(
+        input({
+          checkins: [
+            kosong('2026-07-05'),
+            kosong('2026-07-10'),
+            dengan('2026-07-18', 'kulit', 'Ruam'),
+            kosong('2026-07-25'),
+            kosong('2026-07-28'),
+            kosong('2026-07-30'),
+          ],
+        })
+      )
+    );
+    expect(teks).toContain('terakhir 18 Jul 2026');
+    expect(teks).toContain('3 check-in sesudahnya tanpa keluhan ini');
+  });
+
+  it('gejala yang masih berlangsung tidak diberi embel-embel sesudahnya', () => {
+    const teks = ringkasanTeks(
+      buatRingkasan(
+        input({
+          checkins: [
+            dengan('2026-07-05', 'sendi', 'Nyeri sendi'),
+            dengan('2026-07-30', 'sendi', 'Nyeri sendi'),
+          ],
+        })
+      )
+    );
+    expect(teks).toContain('terakhir 30 Jul 2026');
+    expect(teks).not.toContain('check-in sesudahnya');
+  });
+});

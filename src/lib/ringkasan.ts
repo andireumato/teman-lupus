@@ -114,6 +114,22 @@ export interface GejalaRingkas {
   /** Proporsi check-in yang mencatatnya, per paruh periode (0–1). */
   freqAwal: number;
   freqAkhir: number;
+  /**
+   * Tanggal terakhir gejala ini dilaporkan, YYYY-MM-DD.
+   *
+   * Tanpa ini dokter tidak bisa tahu kapan pasien memasukkannya, dan sebuah
+   * keluhan dari tiga minggu lalu terbaca sama mendesaknya dengan keluhan
+   * kemarin.
+   */
+  terakhir: string;
+  /**
+   * Jumlah hari check-in SESUDAH `terakhir` yang tidak menyebutkan gejala ini.
+   *
+   * Nol berarti gejalanya masih dilaporkan pada check-in terbaru. Angka besar
+   * berarti pasien tetap mengisi tetapi keluhannya sudah tidak ada lagi — dan
+   * itu bukti yang berbeda sama sekali dari pasien yang berhenti mengisi.
+   */
+  checkinSesudahnya: number;
 }
 
 export interface ObatTerlewat {
@@ -360,6 +376,16 @@ function isAngka(v: number | null): v is number {
  */
 const AMBANG_GESER = 0.25;
 
+/**
+ * Berapa hari check-in tanpa keluhan sebelum gejala dianggap sudah berhenti.
+ *
+ * Tiga, bukan satu: satu hari tanpa keluhan terlalu mudah membuat kategorinya
+ * bolak-balik antar-kunjungan, dan dokter yang membaca ringkasan dua kali
+ * dalam seminggu akan melihat gejala yang sama berpindah kolom tanpa sebab
+ * klinis.
+ */
+const AMBANG_BERHENTI = 3;
+
 function gejalaMenonjol(
   rows: DailyCheckin[],
   dari: string,
@@ -369,7 +395,13 @@ function gejalaMenonjol(
   const awal = rows.filter((r) => r.tanggal < batas);
   const akhir = rows.filter((r) => r.tanggal >= batas);
 
-  type Hitung = { system: string; item: string; awal: number; akhir: number };
+  type Hitung = {
+    system: string;
+    item: string;
+    awal: number;
+    akhir: number;
+    terakhir: string;
+  };
   const peta = new Map<string, Hitung>();
 
   const catat = (bagian: DailyCheckin[], sisi: 'awal' | 'akhir') => {
@@ -377,14 +409,26 @@ function gejalaMenonjol(
       for (const g of r.gejala ?? []) {
         if (!g.present) continue;
         const k = `${g.system}|${g.item}`;
-        const h = peta.get(k) ?? { system: g.system, item: g.item, awal: 0, akhir: 0 };
+        const h = peta.get(k) ?? {
+          system: g.system,
+          item: g.item,
+          awal: 0,
+          akhir: 0,
+          terakhir: r.tanggal,
+        };
         h[sisi] += 1;
+        // Baris check-in tidak dijamin urut, jadi tanggal terbesar yang menang.
+        if (r.tanggal > h.terakhir) h.terakhir = r.tanggal;
         peta.set(k, h);
       }
     }
   };
   catat(awal, 'awal');
   catat(akhir, 'akhir');
+
+  // Tanggal seluruh hari check-in dalam periode, untuk menghitung berapa hari
+  // pasien tetap mengisi SESUDAH sebuah gejala terakhir dilaporkan.
+  const hariCheckin = rows.map((r) => r.tanggal);
 
   const hasil: Record<KategoriGejala, GejalaRingkas[]> = {
     baru: [],
@@ -397,11 +441,28 @@ function gejalaMenonjol(
     const freqAwal = awal.length === 0 ? 0 : h.awal / awal.length;
     const freqAkhir = akhir.length === 0 ? 0 : h.akhir / akhir.length;
 
+    // Hari pasien tetap mengisi tetapi tidak lagi menyebut gejala ini.
+    const checkinSesudahnya = hariCheckin.filter((t) => t > h.terakhir).length;
+    const sudahBerhenti = checkinSesudahnya >= AMBANG_BERHENTI;
+
     let kategori: KategoriGejala;
     if (awal.length === 0 || akhir.length === 0) {
       // Tanpa pembanding di salah satu paruh, "baru" atau "membaik" tidak bisa
       // dibuktikan. Dicatat netral sebagai menetap agar tidak menyesatkan.
       kategori = 'menetap';
+    } else if (sudahBerhenti) {
+      // DIPERIKSA SEBELUM `baru`, dan urutan itu inti perbaikannya.
+      //
+      // Sebelum 1 Agustus 2026, `h.awal === 0` diperiksa lebih dahulu, sehingga
+      // gejala yang pertama muncul di paruh kedua TIDAK PERNAH bisa keluar dari
+      // "Baru muncul" — berapa lama pun sudah berhenti. Ruam yang dilaporkan
+      // sekali lalu hilang tetap terbaca sebagai keluhan baru berminggu-minggu
+      // kemudian.
+      //
+      // `sudahBerhenti` menuntut pasien MASIH mengisi check-in sesudahnya.
+      // Pasien yang berhenti mengisi sama sekali tidak akan pernah masuk sini:
+      // tidak adanya data bukan tidak adanya gejala.
+      kategori = 'membaik';
     } else if (h.awal === 0) {
       kategori = 'baru';
     } else if (freqAkhir - freqAwal >= AMBANG_GESER) {
@@ -420,6 +481,8 @@ function gejalaMenonjol(
       hari: h.awal + h.akhir,
       freqAwal: bulat2(freqAwal),
       freqAkhir: bulat2(freqAkhir),
+      terakhir: h.terakhir,
+      checkinSesudahnya,
     });
   }
 
@@ -983,9 +1046,24 @@ export function buatRingkasan(input: RingkasanInput): Ringkasan {
 
 const ARAH_TEKS: Record<Arah, string> = { naik: 'naik', turun: 'turun', stabil: 'stabil' };
 
+/**
+ * Satu baris gejala untuk teks ringkasan.
+ *
+ * Tanggal terakhir SELALU ikut. Tanpa itu, keluhan tiga minggu lalu terbaca
+ * sama mendesaknya dengan keluhan kemarin — dan dokter tidak punya cara
+ * membedakannya dari halaman ini.
+ */
 function daftarGejala(list: GejalaRingkas[]): string {
   if (list.length === 0) return '—';
-  return list.map((g) => `${g.item} (${g.sistemLabel}, ${g.hari} hari)`).join('; ');
+  return list
+    .map((g) => {
+      const sesudah =
+        g.checkinSesudahnya > 0
+          ? `, ${g.checkinSesudahnya} check-in sesudahnya tanpa keluhan ini`
+          : '';
+      return `${g.item} (${g.sistemLabel}, ${g.hari} hari, terakhir ${tanggalPendek(g.terakhir)}${sesudah})`;
+    })
+    .join('; ');
 }
 
 /**

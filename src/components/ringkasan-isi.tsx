@@ -31,7 +31,11 @@ function BarisGejala({ judul, list }: { judul: string; list: GejalaRingkas[] }) 
           <Text key={`${g.system}|${g.item}`} style={styles.item}>
             • {g.item}{' '}
             <Text style={styles.lembut}>
-              ({g.sistemLabel}, {g.hari} hari)
+              ({g.sistemLabel}, {g.hari} hari, terakhir {tanggalPendek(g.terakhir)}
+              {g.checkinSesudahnya > 0
+                ? `, ${g.checkinSesudahnya} check-in sesudahnya tanpa keluhan ini`
+                : ''}
+              )
             </Text>
           </Text>
         ))
