@@ -162,6 +162,21 @@ export async function matikanPengingat(): Promise<void> {
  * kalau semuanya dibatalkan, dan pengujian jadi mustahil. Menyaring lewat
  * penanda `jenis` juga menjaga notifikasi lain yang mungkin ditambahkan kelak.
  */
+/**
+ * Berapa pengingat obat yang BENAR-BENAR dipegang sistem sekarang.
+ *
+ * Dibutuhkan karena kartu pengingat selama ini menampilkan panjang rencana —
+ * jumlah yang kita NIATKAN pasang — bukan jumlah yang tersimpan di Android.
+ * Keduanya berbeda pada keadaan yang justru paling penting: ColorOS dan MIUI
+ * membatalkan seluruh alarm ketika aplikasi digeser dari daftar recent, dan
+ * sesudah itu kartu tetap berkata "3 pengingat aktif" padahal tidak ada satu
+ * pun yang akan berbunyi.
+ */
+export async function terpasangDiSistem(): Promise<number> {
+  const semua = await Notifications.getAllScheduledNotificationsAsync();
+  return semua.filter((n) => n.content.data?.jenis === JENIS_PENGINGAT_OBAT).length;
+}
+
 async function batalkanPengingatObat(): Promise<void> {
   const semua = await Notifications.getAllScheduledNotificationsAsync();
   for (const n of semua) {

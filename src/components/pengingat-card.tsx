@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Platform, StyleSheet, Switch, Text, View } from 'react-native';
 
@@ -11,10 +11,17 @@ import {
   matikanPengingat,
   mintaIzin,
   pasangPengingat,
+  terpasangDiSistem,
   ujiBunyi,
   type IzinNotifikasi,
 } from '@/lib/notifikasi';
-import { pengingatBerikutnya, rencanaPengingat, tulisJam } from '@/lib/pengingat';
+import {
+  diagnosaPengingat,
+  pengingatBerikutnya,
+  rencanaPengingat,
+  tulisJam,
+  type DiagnosaPengingat,
+} from '@/lib/pengingat';
 import type { Medication } from '@/types/database';
 
 /**
@@ -35,6 +42,7 @@ import type { Medication } from '@/types/database';
 const KUNCI = 'temanlupus.pengingat.aktif';
 
 export function PengingatCard({ meds }: { meds: Medication[] }) {
+  const router = useRouter();
   // Notifikasi lokal tidak berjalan di browser; menampilkan saklar yang tidak
   // melakukan apa-apa lebih buruk daripada mengatakannya terus terang.
   const didukung = Platform.OS !== 'web';
@@ -42,6 +50,15 @@ export function PengingatCard({ meds }: { meds: Medication[] }) {
   const [aktif, setAktif] = useState(false);
   const [izin, setIzin] = useState<IzinNotifikasi>('undetermined');
   const [jumlah, setJumlah] = useState(0);
+  /**
+   * Hasil membandingkan rencana dengan isi jadwal sistem yang sebenarnya.
+   *
+   * Sebelum ini kartu menampilkan panjang rencana dan menyebutnya "pengingat
+   * aktif" — padahal itu jumlah yang kita NIATKAN pasang. Pada ponsel yang
+   * membuang alarm saat aplikasi ditutup, keduanya berbeda persis pada saat
+   * pasien paling perlu diberi tahu.
+   */
+  const [diagnosa, setDiagnosa] = useState<DiagnosaPengingat | null>(null);
   /** Pesan setelah tombol coba-bunyikan ditekan. */
   const [uji, setUji] = useState<string | null>(null);
   const [siap, setSiap] = useState(!didukung);
@@ -74,9 +91,13 @@ export function PengingatCard({ meds }: { meds: Medication[] }) {
       if (simpan === '1' && status === 'granted') {
         await pasangPengingat(rencana);
         setJumlah(rencana.length);
+        // Dibaca SESUDAH pemasangan ulang, jadi selisih apa pun berarti sistem
+        // menolak atau membuang alarmnya — bukan sekadar belum sempat dipasang.
+        setDiagnosa(diagnosaPengingat(rencana.length, await terpasangDiSistem()));
       } else {
         await matikanPengingat();
         setJumlah(0);
+        setDiagnosa(null);
       }
       setErr(null);
     } catch (e) {
@@ -180,6 +201,19 @@ export function PengingatCard({ meds }: { meds: Medication[] }) {
         </Text>
       )}
 
+      {/* Hanya bicara saat ada yang salah. Baris pemeriksa yang selalu tampil
+          pernah ada di sini dan dibuang karena jadi bising ketika semuanya
+          memang bekerja — lihat catatan 30 Juli 2026. */}
+      {nyala && diagnosa?.pesan && (
+        <>
+          <Msg tone="err">{diagnosa.pesan}</Msg>
+          <GhostButton
+            label="Kenapa pengingat tidak berbunyi?"
+            onPress={() => router.push('/pengingat-bantuan')}
+          />
+        </>
+      )}
+
       {nyala && jumlah > 0 && (
         <Text style={styles.catatan}>
           Pengingat tetap berbunyi meski dosisnya sudah kamu centang lebih dulu — abaikan saja kalau
@@ -188,6 +222,16 @@ export function PengingatCard({ meds }: { meds: Medication[] }) {
       )}
 
       {uji && <Msg tone="ok">{uji}</Msg>}
+      {/* Tautan bantuan selalu tersedia, bukan hanya saat terdeteksi rusak:
+          pengingat bisa gagal berbunyi tanpa jadwalnya hilang, misalnya ketika
+          ponsel menunda alarm demi menghemat baterai. */}
+      {nyala && !diagnosa?.pesan && (
+        <GhostButton
+          label="Pengingat tidak berbunyi?"
+          onPress={() => router.push('/pengingat-bantuan')}
+        />
+      )}
+
       <GhostButton
         label="Coba bunyikan pengingat"
         onPress={() => {

@@ -140,3 +140,48 @@ export function pengingatBerikutnya(daftar: Pengingat[], sekarang: Date): Pengin
   const menit = (p: Pengingat) => p.hour * 60 + p.minute;
   return daftar.find((p) => menit(p) > kini) ?? daftar[0];
 }
+
+export type StatusPemasangan = 'sehat' | 'sebagian' | 'hilang' | 'tak-relevan';
+
+export interface DiagnosaPengingat {
+  status: StatusPemasangan;
+  direncanakan: number;
+  terpasang: number;
+  /** Kalimat siap tampil; null bila tidak ada yang perlu dikatakan. */
+  pesan: string | null;
+}
+
+/**
+ * Membandingkan pengingat yang DIRENCANAKAN dengan yang benar-benar dipegang
+ * sistem.
+ *
+ * Murni supaya bisa diuji tanpa Android. Dipanggil setelah pemasangan ulang,
+ * sehingga selisih apa pun berarti sistem menolak atau membuang alarmnya —
+ * bukan sekadar belum sempat terpasang.
+ *
+ * `tak-relevan` ketika memang tidak ada yang perlu dipasang. Tanpa keadaan itu,
+ * pasien tanpa obat berjam akan melihat peringatan "pengingat hilang" yang
+ * tidak ada artinya.
+ */
+export function diagnosaPengingat(direncanakan: number, terpasang: number): DiagnosaPengingat {
+  if (direncanakan === 0) {
+    return { status: 'tak-relevan', direncanakan, terpasang, pesan: null };
+  }
+  if (terpasang >= direncanakan) {
+    return { status: 'sehat', direncanakan, terpasang, pesan: null };
+  }
+  if (terpasang === 0) {
+    return {
+      status: 'hilang',
+      direncanakan,
+      terpasang,
+      pesan: `Tidak ada satu pun dari ${direncanakan} pengingat yang tersimpan di sistem. Ponselmu kemungkinan menghapusnya saat aplikasi ditutup.`,
+    };
+  }
+  return {
+    status: 'sebagian',
+    direncanakan,
+    terpasang,
+    pesan: `Baru ${terpasang} dari ${direncanakan} pengingat yang tersimpan di sistem.`,
+  };
+}

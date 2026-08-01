@@ -88,6 +88,7 @@ function AuthGate() {
       <Stack.Screen name="efek-samping" options={{ title: 'Efek Samping Obat' }} />
       <Stack.Screen name="profil" options={{ title: 'Profil Saya' }} />
       <Stack.Screen name="hapus-akun" options={{ title: 'Hapus Akun' }} />
+      <Stack.Screen name="pengingat-bantuan" options={{ title: 'Pengingat Tidak Berbunyi' }} />
       <Stack.Screen name="dokter" options={{ headerShown: false }} />
     </Stack>
   );

@@ -1,4 +1,5 @@
 import {
+  diagnosaPengingat,
   bacaJam,
   JAM_BAWAAN,
   MAKS_DOSIS,
@@ -189,5 +190,46 @@ describe('pengingatBerikutnya', () => {
 
   it('null bila tidak ada pengingat', () => {
     expect(pengingatBerikutnya([], jam(9))).toBeNull();
+  });
+});
+
+describe('diagnosaPengingat', () => {
+  it('tidak berkata apa-apa saat memang tidak ada yang perlu dipasang', () => {
+    // Pasien tanpa obat berjam tidak boleh melihat peringatan "pengingat
+    // hilang" — tidak ada yang hilang.
+    const d = diagnosaPengingat(0, 0);
+    expect(d.status).toBe('tak-relevan');
+    expect(d.pesan).toBeNull();
+  });
+
+  it('diam saat semuanya terpasang', () => {
+    const d = diagnosaPengingat(3, 3);
+    expect(d.status).toBe('sehat');
+    expect(d.pesan).toBeNull();
+  });
+
+  it('tetap sehat bila sistem memegang LEBIH banyak', () => {
+    // Bisa terjadi sesaat setelah jadwal dikurangi. Bukan kegagalan, dan
+    // memperingatkan pasien untuk itu hanya membuat bising.
+    expect(diagnosaPengingat(2, 3).status).toBe('sehat');
+  });
+
+  it('nol terpasang padahal direncanakan = hilang, dengan sebab yang disebut', () => {
+    const d = diagnosaPengingat(3, 0);
+    expect(d.status).toBe('hilang');
+    expect(d.pesan).toContain('Tidak ada satu pun');
+    expect(d.pesan).toContain('saat aplikasi ditutup');
+  });
+
+  it('sebagian terpasang disebut angkanya', () => {
+    const d = diagnosaPengingat(3, 1);
+    expect(d.status).toBe('sebagian');
+    expect(d.pesan).toContain('1 dari 3');
+  });
+
+  it('selalu membawa kedua angkanya untuk ditampilkan', () => {
+    const d = diagnosaPengingat(5, 2);
+    expect(d.direncanakan).toBe(5);
+    expect(d.terpasang).toBe(2);
   });
 });
