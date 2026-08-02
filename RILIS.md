@@ -26,6 +26,24 @@ Sesudah terbit, cocokkan `Runtime version` pada keluarannya dengan
 `Fingerprint` milik APK yang dipegang pasien (`eas build:view <id>`). Kalau
 berbeda, update itu tidak akan pernah sampai ke mereka.
 
+### Kapan update itu benar-benar terpasang
+
+`app.json` menyetel `fallbackToCacheTimeout: 0`, jadi aplikasi tidak pernah
+menahan layar menunggu unduhan: ia memuat versi lama yang tersimpan, mengunduh
+yang baru di latar belakang, lalu memasangnya pada **pembukaan dingin
+berikutnya**. Setiap update selalu butuh dua kali buka. Itu disengaja — pasien
+yang sedang tidak enak badan tidak pantas menunggu layar splash saat sinyalnya
+jelek.
+
+Untuk menguji sendiri: buka, tunggu ~10 detik, geser aplikasi keluar dari daftar
+aplikasi terbaru, buka lagi.
+
+**Jangan menyuruh pasien melakukan itu.** Menggeser aplikasi dari daftar terbaru
+membuang seluruh alarm terjadwal di ColorOS, MIUI, dan Funtouch — lihat
+`src/app/pengingat-bantuan.tsx`. Pasien akan mendapatkan updatenya sendiri dalam
+pemakaian biasa, ketika ponsel di-restart atau aplikasinya ditutup sistem. Kalau
+sebuah perbaikan memang mendesak, sampaikan isinya, bukan cara memaksanya.
+
 ## Jalur 2: build APK baru (pasien harus memasang ulang)
 
 Wajib bila menyentuh kode native: menambah/menghapus pustaka, mengubah izin di
