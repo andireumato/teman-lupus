@@ -149,6 +149,26 @@ pengumpulan data membuat kedua bagiannya tidak bisa digabung.
 
 ---
 
+## Catatan pengiriman
+
+**3 Agustus 2026** — email terkirim ke `r.horne@ucl.ac.uk`. Balasan yang masuk
+adalah pemberitahuan otomatis: beliau di luar kantor sampai **4 Agustus** dengan
+akses email terbatas. Bukan penolakan, dan bukan alamat yang memantul — surat
+itu sampai.
+
+Patokan waktu, dihitung dari tanggal beliau kembali:
+
+- **sekitar 18 Agustus 2026** — bila belum ada balasan, kirim susulan singkat
+  dengan email pertama dikutip di bawahnya (langkah 3 di atas).
+- **sekitar 1 September 2026** — bila masih sunyi, tempuh jalur sekretariat
+  Centre for Behavioural Medicine dan ePROVIDE (langkah 4).
+
+Jangan menyusul lebih cepat dari itu. Beliau baru kembali dari cuti dan akan
+menghadapi tumpukan surat; susulan pada pekan pertama justru menenggelamkan
+permohonan ini di antara yang lain.
+
+---
+
 ## Berjalan paralel dengan pengajuan etik
 
 Permohonan ini **tidak perlu menunggu** persetujuan etik, dan sebaliknya.
