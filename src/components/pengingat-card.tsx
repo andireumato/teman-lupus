@@ -6,6 +6,7 @@ import { Platform, StyleSheet, Switch, Text, View } from 'react-native';
 import { Card, GhostButton, Msg, SectionLabel } from '@/components/ui/kit';
 import { Brand, space } from '@/constants/brand';
 import {
+  buangPengingatHariLalu,
   cekIzin,
   matikanPengingat,
   mintaIzin,
@@ -78,11 +79,13 @@ export function PengingatCard({ meds }: { meds: Medication[] }) {
 
   const sinkron = useCallback(async () => {
     if (!didukung) return;
-    // Angka di ikon SENGAJA tidak disentuh di sini. Sejak 2 Agustus 2026 ia
-    // berarti "dosis yang belum dijawab", dan yang memegang hitungannya adalah
-    // layar Obat — lihat `belumDijawab` di app/(tabs)/obat.tsx. Menolkannya di
-    // sini akan menghapus tunggakan yang sebenarnya masih ada, tepat pada saat
-    // pasien membuka layarnya.
+    // Angka di ikon aplikasi TIDAK disetel dari kode — Android tidak
+    // menyediakan caranya tanpa notifikasi aktif. Angkanya adalah jumlah
+    // pengingat yang masih menunggu di baki, jadi yang perlu diurus hanyalah
+    // membuang pengingat yang sudah tidak berlaku. Jangan tambahkan
+    // `setBadgeCountAsync` di sini: nilai 0 memanggil `cancelAll()` di native
+    // dan justru menyapu pengingat yang menjadi penanda itu sendiri.
+    void buangPengingatHariLalu();
     const [simpan, status] = await Promise.all([AsyncStorage.getItem(KUNCI), cekIzin()]);
     setAktif(simpan === '1');
     setIzin(status);

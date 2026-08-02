@@ -93,36 +93,17 @@ async function siapkanChannel(): Promise<void> {
     // plugin expo-notifications di app.json.
     enableVibrate: true,
     vibrationPattern: [0, 250, 250, 250],
+    // Inilah yang mengizinkan titik/angka muncul di ikon aplikasi. Bawaan
+    // Android memang `true`, jadi channel yang sudah terlanjur dibuat di ponsel
+    // pasien tetap benar — ditulis di sini supaya tidak ada yang mematikannya
+    // tanpa sengaja. Setelan channel terkunci setelah dibuat; mengubah nilai
+    // ini kelak menuntut nama channel baru.
+    showBadge: true,
   });
 
   for (const lama of CHANNEL_LAMA) {
     await Notifications.deleteNotificationChannelAsync(lama);
   }
-}
-
-/**
- * Menyetel angka di ikon aplikasi sesuai dosis yang belum dijawab.
- *
- * BATAS YANG HARUS DIKETAHUI SEBELUM MEMPERCAYAI ANGKA INI.
- *
- * Aplikasi tidak dapat menyentuh ikonnya sendiri saat tidak berjalan. Angka ini
- * hanya diperbarui ketika aplikasi terbuka, dan di antara dua pembukaan yang
- * mengubah tampilan ikon hanyalah notifikasi pengingat yang terbit. Karena itu
- * angkanya tepat setiap kali pasien membuka aplikasi, dan bisa tertinggal
- * sesudahnya.
- *
- * Nol diperlakukan khusus: di dalam expo-notifications, `setBadgeCountAsync(0)`
- * memanggil `notificationManager.cancelAll()`, sehingga ia SEKALIGUS menyapu
- * seluruh notifikasi yang masih menunggu. Itu memang yang diinginkan di sini —
- * tidak ada tunggakan berarti tidak ada yang perlu ditagih.
- *
- * Angkanya tidak muncul di semua ponsel. Android tidak punya badge angka baku;
- * expo-notifications memakai ShortcutBadger, yang bekerja pada ColorOS, MIUI,
- * dan One UI, tetapi tidak pada Pixel maupun Android murni — di sana hanya ada
- * titik tanpa angka.
- */
-export async function setBadgeDosis(jumlah: number): Promise<void> {
-  await Notifications.setBadgeCountAsync(Math.max(0, jumlah));
 }
 
 /**
@@ -141,6 +122,40 @@ export async function tutupPengingatDosis(medicationId: string, slot: number): P
   for (const n of tampil) {
     const d = n.request.content.data;
     if (d?.jenis === JENIS_PENGINGAT_OBAT && d?.medicationId === medicationId && d?.slot === slot) {
+      await Notifications.dismissNotificationAsync(n.request.identifier);
+    }
+  }
+}
+
+/**
+ * Membuang pengingat dari hari-hari sebelumnya yang tak pernah dijawab.
+ *
+ * Angka di ikon aplikasi adalah jumlah pengingat yang masih menunggu di baki.
+ * Pengingat kemarin yang tidak dijawab tetap di sana selamanya, padahal
+ * dosisnya sudah tidak muncul lagi di layar Obat — layar itu hanya menampilkan
+ * hari ini. Pasien tidak punya cara menghapusnya lewat aplikasi, jadi angkanya
+ * akan naik terus sampai tidak berarti apa-apa lagi, dan angka yang selalu
+ * salah adalah angka yang berhenti dibaca orang.
+ *
+ * Yang hilang di sini hanya penandanya, bukan datanya: dosis yang terlewat
+ * tetap tercatat sebagai tidak dijawab di `med_logs` dan tetap terbawa ke
+ * ringkasan pra-kunjungan maupun ekspor penelitian.
+ */
+export async function buangPengingatHariLalu(sekarang: Date = new Date()): Promise<void> {
+  const awalHariIni = new Date(
+    sekarang.getFullYear(),
+    sekarang.getMonth(),
+    sekarang.getDate()
+  ).getTime();
+
+  const tampil = await Notifications.getPresentedNotificationsAsync();
+  for (const n of tampil) {
+    if (n.request.content.data?.jenis !== JENIS_PENGINGAT_OBAT) continue;
+    // `date` dalam milidetik sejak epoch pada Android; iOS memakai detik pada
+    // sebagian versi, jadi nilai yang jelas terlalu kecil dibiarkan saja
+    // daripada salah membuang pengingat hari ini.
+    const waktu = typeof n.date === 'number' ? n.date : NaN;
+    if (Number.isFinite(waktu) && waktu > 1e11 && waktu < awalHariIni) {
       await Notifications.dismissNotificationAsync(n.request.identifier);
     }
   }

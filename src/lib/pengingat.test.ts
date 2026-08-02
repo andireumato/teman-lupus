@@ -1,7 +1,5 @@
 import {
   diagnosaPengingat,
-  dosisBelumDijawab,
-  type Pengingat,
   bacaJam,
   JAM_BAWAAN,
   MAKS_DOSIS,
@@ -233,60 +231,5 @@ describe('diagnosaPengingat', () => {
     const d = diagnosaPengingat(5, 2);
     expect(d.direncanakan).toBe(5);
     expect(d.terpasang).toBe(2);
-  });
-});
-
-describe('dosisBelumDijawab', () => {
-  const jam = (h: number, m = 0) => {
-    const d = new Date('2026-08-02T00:00:00');
-    d.setHours(h, m, 0, 0);
-    return d;
-  };
-  const p = (medicationId: string, slot: number, hour: number): Pengingat => ({
-    kunci: `${medicationId}#${slot}`,
-    medicationId,
-    slot,
-    hour,
-    minute: 0,
-    judul: 'Waktunya obat',
-    isi: '',
-  });
-  const rencana = [p('m1', 0, 7), p('m1', 1, 13), p('m1', 2, 19)];
-
-  it('dosis yang belum tiba waktunya tidak dihitung', () => {
-    // Ikon yang sejak pagi menunjukkan tiga hanya mengajari pasien
-    // mengabaikannya.
-    expect(dosisBelumDijawab(rencana, [], jam(6))).toBe(0);
-    expect(dosisBelumDijawab(rencana, [], jam(7))).toBe(1);
-    expect(dosisBelumDijawab(rencana, [], jam(13, 30))).toBe(2);
-    expect(dosisBelumDijawab(rencana, [], jam(23))).toBe(3);
-  });
-
-  it('dosis yang dijawab tidak dihitung, diminum maupun tidak', () => {
-    // Pasien yang menandai TIDAK meminum sudah menjawab; menagihnya lagi
-    // berarti menegur orang yang justru jujur.
-    const dijawab = [{ medicationId: 'm1', slot: 0 }];
-    expect(dosisBelumDijawab(rencana, dijawab, jam(23))).toBe(2);
-  });
-
-  it('jawaban untuk dosis yang belum tiba tidak mengurangi apa pun', () => {
-    const dijawab = [{ medicationId: 'm1', slot: 2 }];
-    expect(dosisBelumDijawab(rencana, dijawab, jam(8))).toBe(1);
-  });
-
-  it('jawaban untuk obat lain tidak ikut mengurangi', () => {
-    // Kunci harus memuat medicationId; tanpa itu slot 0 obat A akan
-    // menghapus tunggakan slot 0 obat B.
-    const dua = [p('m1', 0, 7), p('m2', 0, 7)];
-    expect(dosisBelumDijawab(dua, [{ medicationId: 'm1', slot: 0 }], jam(9))).toBe(1);
-  });
-
-  it('semua dijawab menghasilkan nol', () => {
-    const semua = rencana.map((x) => ({ medicationId: x.medicationId, slot: x.slot }));
-    expect(dosisBelumDijawab(rencana, semua, jam(23))).toBe(0);
-  });
-
-  it('tanpa rencana selalu nol', () => {
-    expect(dosisBelumDijawab([], [], jam(23))).toBe(0);
   });
 });

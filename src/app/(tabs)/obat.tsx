@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Link, useFocusEffect } from 'expo-router';
-import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import {
   Card,
@@ -20,8 +20,8 @@ import { Brand, radius, space } from '@/constants/brand';
 import { PengingatCard } from '@/components/pengingat-card';
 import { DISCLAIMER } from '@/constants/consent';
 import { tanggalPendek, todayISO } from '@/lib/dates';
-import { setBadgeDosis, tutupPengingatDosis } from '@/lib/notifikasi';
-import { bacaJam, dosisBelumDijawab, rencanaPengingat, sesuaikanJam } from '@/lib/pengingat';
+import { tutupPengingatDosis } from '@/lib/notifikasi';
+import { bacaJam, sesuaikanJam } from '@/lib/pengingat';
 import { useSession } from '@/lib/session';
 import { supabase } from '@/lib/supabase';
 import type { MedLog, Medication, MedicationEvent } from '@/types/database';
@@ -173,33 +173,15 @@ export default function ObatScreen() {
       return;
     }
 
-    // Pengingat dosis ini sudah selesai tugasnya. Dibiarkan menunggu di panel
-    // notifikasi, peluncur tetap menghitungnya sebagai tunggakan — sehingga
-    // angka di ikon berselisih dengan kotak centang yang baru saja dicentang.
+    // INILAH yang membuat angka di ikon aplikasi benar.
+    //
+    // Android tidak menyediakan cara menandai ikon tanpa notifikasi aktif, jadi
+    // penandanya adalah pengingat yang masih menunggu di baki. Selama satu
+    // pengingat belum dijawab ia tetap di sana dan tetap dihitung peluncur;
+    // begitu dosisnya dijawab, pengingatnya harus ikut hilang. Tanpa baris ini
+    // angka di ikon akan berselisih dengan kotak centang yang baru saja diisi.
     void tutupPengingatDosis(med.id, slot);
   }
-
-  /**
-   * Angka di ikon aplikasi = dosis hari ini yang waktunya sudah lewat tetapi
-   * belum dijawab.
-   *
-   * Dihitung ulang setiap kali daftar obat atau catatan dosis berubah, jadi
-   * mencentang satu kotak langsung menurunkan angkanya. Sengaja diurus di sini,
-   * bukan di kartu pengingat: layar inilah yang memegang kedua bahannya, dan
-   * dua tempat yang menyetel angka yang sama adalah cara termudah membuat
-   * keduanya berselisih.
-   */
-  const belumDijawab = useMemo(() => {
-    const dijawab = Object.values(logs)
-      .filter((l) => l.diminum !== null && l.diminum !== undefined)
-      .map((l) => ({ medicationId: l.medication_id ?? '', slot: l.slot ?? 0 }));
-    return dosisBelumDijawab(rencanaPengingat(meds), dijawab, new Date());
-  }, [meds, logs]);
-
-  useEffect(() => {
-    if (Platform.OS === 'web') return;
-    void setBadgeDosis(belumDijawab);
-  }, [belumDijawab]);
 
   async function simpanObat() {
     if (!patientId) return;
