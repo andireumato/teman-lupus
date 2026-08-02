@@ -5,6 +5,7 @@ import type {
   DailyCheckin,
   FlareCheck,
   LupusQolAssessment,
+  Medication,
   MedicationEvent,
   Patient,
   SledaiAssessment,
@@ -706,6 +707,49 @@ describe('obat_riwayat.csv', () => {
     catatan: null,
     created_at: '2026-07-01T08:00:00+07:00',
     ...p,
+  });
+
+  const obat = (nama: string, id: string, p: Partial<Medication> = {}): Medication => ({
+    id,
+    patient_id: P1,
+    nama_obat: nama,
+    dosis: null,
+    jadwal: null,
+    frekuensi: 1,
+    jam: null,
+    pola: 'harian',
+    hari_minggu: null,
+    selang_hari: null,
+    mulai_tanggal: null,
+    aktif: true,
+    created_at: '2026-07-01T08:00:00+07:00',
+    ...p,
+  });
+
+  it('membawa pola hari minum — tanpa ini penyebut kepatuhan salah', () => {
+    // Metotreksat mingguan yang diekspor tanpa polanya akan dihitung sebagai
+    // 30 dosis terjadwal sebulan padahal hanya 4, dan kepatuhan peserta
+    // terlihat runtuh hanya karena aritmetikanya salah.
+    const b = ambil(
+      rakitEkspor(
+        data({
+          meds: [
+            obat('Metotreksat', 'mtx', { pola: 'mingguan', hari_minggu: [1] }),
+            obat('Prednison', 'pred', {
+              pola: 'selang',
+              selang_hari: 2,
+              mulai_tanggal: '2026-07-01',
+            }),
+          ],
+        })
+      ),
+      'obat.csv'
+    );
+    expect(baris(b)[0]).toContain(
+      'frekuensi_per_hari_minum,pola,hari_minggu_iso,selang_hari,mulai_tanggal'
+    );
+    expect(b.isi).toContain('mingguan,1,,');
+    expect(b.isi).toContain('selang,,2,2026-07-01');
   });
 
   it('memuat rentang aktif obat — penyebut dosis terjadwal', () => {

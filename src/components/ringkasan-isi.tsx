@@ -156,7 +156,7 @@ export function RingkasanIsi({
           • <Text style={styles.tebal}>Sedang diminum:</Text>{' '}
           {r.obat.sedangDiminum.length === 0
             ? 'tidak ada obat aktif'
-            : r.obat.sedangDiminum.map((o) => `${o.nama} (${o.frekuensi}x/hari)`).join(', ')}
+            : r.obat.sedangDiminum.map((o) => `${o.nama} (${o.polaLabel})`).join(', ')}
         </Text>
         {r.obat.perubahan.length > 0 && (
           <Text style={styles.item}>

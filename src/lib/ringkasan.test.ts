@@ -52,6 +52,10 @@ function med(nama: string, medId = id(), p: Partial<Medication> = {}): Medicatio
     jadwal: null,
     frekuensi: 1,
     jam: null,
+    pola: 'harian',
+    hari_minggu: null,
+    selang_hari: null,
+    mulai_tanggal: null,
     aktif: true,
     created_at: '2026-01-01T00:00:00+07:00',
     ...p,
@@ -603,6 +607,7 @@ describe('kepatuhan obat', () => {
         id: 'm1',
         nama: 'Hidroksiklorokuin',
         frekuensi: 1,
+        polaLabel: 'setiap hari',
         aktif: true,
         perubahan: '',
         terlewat: 2,
@@ -635,6 +640,7 @@ describe('kepatuhan obat', () => {
       id: 'm3',
       nama: 'Metilprednisolon',
       frekuensi: 3,
+      polaLabel: '3x sehari',
       aktif: true,
       perubahan: '',
       terlewat: 1,
@@ -1379,5 +1385,25 @@ describe('gejala yang berhenti dilaporkan', () => {
     );
     expect(teks).toContain('terakhir 30 Jul 2026');
     expect(teks).not.toContain('check-in sesudahnya');
+  });
+});
+
+describe('ringkasan — obat berpola', () => {
+  it('menyebut metotreksat mingguan sebagai mingguan, bukan 1x/hari', () => {
+    // Dokter yang membaca "1x/hari" pada metotreksat akan salah menilai
+    // takarannya. Ini kesalahan baca yang berbahaya, bukan sekadar kosmetik.
+    const m = med('Metotreksat', 'mtx', { pola: 'mingguan', hari_minggu: [1] });
+    const r = buatRingkasan(input({ meds: [m] }));
+    expect(r.obat.sedangDiminum[0].polaLabel).toBe('tiap Senin');
+  });
+
+  it('menyebut prednison selang-sehari dengan pola selangnya', () => {
+    const m = med('Prednison', 'pred', {
+      pola: 'selang',
+      selang_hari: 2,
+      mulai_tanggal: '2026-07-01',
+    });
+    const r = buatRingkasan(input({ meds: [m] }));
+    expect(r.obat.sedangDiminum[0].polaLabel).toBe('selang sehari');
   });
 });

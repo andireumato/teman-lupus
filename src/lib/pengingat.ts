@@ -14,6 +14,7 @@
  *   dokter adalah dorongan aktif untuk melanggar instruksi.
  */
 
+import { awalHari, hariISO, jatuhPada, polaObat } from '@/lib/pola-minum';
 import type { Medication } from '@/types/database';
 
 /** Batas dosis per hari yang didukung layar obat. */
@@ -68,6 +69,30 @@ export function sesuaikanJam(jam: string[] | null | undefined, frekuensi: number
   return Array.from({ length: n }, (_, i) => ada[i] ?? bawaan[i] ?? bawaan[bawaan.length - 1]);
 }
 
+/**
+ * Kapan sebuah pengingat berbunyi.
+ *
+ * Tiga bentuk karena Android hanya menyediakan pengulangan otomatis untuk dua
+ * di antaranya. Harian dan mingguan punya pemicu berulang sendiri dan bertahan
+ * tanpa aplikasi dibuka. Pola selang TIDAK punya padanannya — tidak ada pemicu
+ * "tiap N hari" — sehingga harus dipasang satu per satu per tanggal dan diisi
+ * ulang setiap pasien membuka layar Obat.
+ */
+export type PemicuPengingat =
+  | { jenis: 'harian' }
+  | { jenis: 'mingguan'; hariISO: number }
+  | { jenis: 'tanggal'; tanggal: Date };
+
+/**
+ * Berapa kali ke depan pengingat pola selang dipasang di muka.
+ *
+ * Dipilih 8, bukan sebanyak-banyaknya. iOS hanya memegang 64 notifikasi
+ * terjadwal sekaligus dan membuang sisanya diam-diam; satu obat selang-sehari
+ * dengan 8 kejadian sudah menutupi lebih dari dua pekan, dan jadwalnya diisi
+ * ulang tiap layar Obat dibuka.
+ */
+export const KEJADIAN_SELANG_DI_MUKA = 8;
+
 export interface Pengingat {
   /** Kunci stabil, dipakai sebagai pembanding saat menjadwal ulang. */
   kunci: string;
@@ -78,6 +103,7 @@ export interface Pengingat {
   minute: number;
   judul: string;
   isi: string;
+  pemicu: PemicuPengingat;
 }
 
 /**
@@ -88,7 +114,7 @@ export interface Pengingat {
  * penambalan bertahap adalah cara paling mudah meninggalkan pengingat yatim
  * untuk obat yang sudah tidak diminum.
  */
-export function rencanaPengingat(meds: Medication[]): Pengingat[] {
+export function rencanaPengingat(meds: Medication[], sekarang: Date = new Date()): Pengingat[] {
   const out: Pengingat[] = [];
 
   for (const m of meds) {
@@ -97,6 +123,7 @@ export function rencanaPengingat(meds: Medication[]): Pengingat[] {
 
     const n = Math.max(1, Math.min(MAKS_DOSIS, m.frekuensi ?? 1));
     const jam = m.jam ?? [];
+    const pola = polaObat(m);
 
     for (let slot = 0; slot < n; slot++) {
       const j = bacaJam(jam[slot]);
@@ -105,8 +132,7 @@ export function rencanaPengingat(meds: Medication[]): Pengingat[] {
       // daripada tidak ada pengingat sama sekali.
       if (!j) continue;
 
-      out.push({
-        kunci: `${m.id}|${slot}`,
+      const dasar = {
         medicationId: m.id,
         slot,
         hour: j.hour,
@@ -119,7 +145,55 @@ export function rencanaPengingat(meds: Medication[]): Pengingat[] {
           n > 1
             ? `Dosis ke-${slot + 1} hari ini. Ketuk untuk mencentang.`
             : 'Ketuk untuk mencentang.',
-      });
+      };
+
+      if (pola === 'harian') {
+        out.push({ ...dasar, kunci: `${m.id}|${slot}`, pemicu: { jenis: 'harian' } });
+        continue;
+      }
+
+      if (pola === 'mingguan') {
+        const hari = (m.hari_minggu ?? []).filter((h) => h >= 1 && h <= 7);
+        for (const h of hari) {
+          out.push({
+            ...dasar,
+            kunci: `${m.id}|${slot}|h${h}`,
+            pemicu: { jenis: 'mingguan', hariISO: h },
+          });
+        }
+        continue;
+      }
+
+      // Pola selang: dipasang per tanggal karena Android tidak punya pemicu
+      // "tiap N hari". Kejadian yang jamnya sudah lewat hari ini dilewati —
+      // menjadwalkan notifikasi ke masa lalu membuatnya berbunyi seketika.
+      const mulaiCek = awalHari(sekarang);
+      let dipasang = 0;
+      for (let i = 0; i < 366 && dipasang < KEJADIAN_SELANG_DI_MUKA; i++) {
+        const tanggal = new Date(
+          mulaiCek.getFullYear(),
+          mulaiCek.getMonth(),
+          mulaiCek.getDate() + i
+        );
+        if (!jatuhPada(m, tanggal)) continue;
+
+        const saat = new Date(tanggal);
+        saat.setHours(j.hour, j.minute, 0, 0);
+        if (saat.getTime() <= sekarang.getTime()) continue;
+
+        // Tanggalnya diberi angka nol di depan. Kunci ikut jadi kunci
+        // pengurutan di bawah, dan tanpa itu 't2026-8-11' mendahului
+        // 't2026-8-3' secara alfabet — daftar pengingat jadi tidak urut waktu.
+        const bulan = String(tanggal.getMonth() + 1).padStart(2, '0');
+        const hariKe = String(tanggal.getDate()).padStart(2, '0');
+
+        out.push({
+          ...dasar,
+          kunci: `${m.id}|${slot}|t${tanggal.getFullYear()}-${bulan}-${hariKe}`,
+          pemicu: { jenis: 'tanggal', tanggal: saat },
+        });
+        dipasang++;
+      }
     }
   }
 
@@ -129,16 +203,61 @@ export function rencanaPengingat(meds: Medication[]): Pengingat[] {
 }
 
 /**
- * Pengingat berikutnya sesudah `sekarang`, untuk ditampilkan di layar.
+ * Kapan sebuah pengingat berbunyi untuk pertama kalinya sesudah `sekarang`.
  *
- * Membandingkan menit-dalam-hari, lalu berputar ke hari berikutnya bila semua
- * jam hari ini sudah lewat.
+ * Dulu layar cukup membandingkan menit-dalam-hari, karena semua obat harian.
+ * Sejak ada pola mingguan dan selang, cara itu akan mengumumkan metotreksat
+ * hari Senin sebagai "berikutnya 08:00" pada hari Rabu.
+ */
+export function waktuBerikutnya(p: Pengingat, sekarang: Date): Date | null {
+  switch (p.pemicu.jenis) {
+    case 'tanggal':
+      return p.pemicu.tanggal.getTime() > sekarang.getTime() ? p.pemicu.tanggal : null;
+
+    case 'harian': {
+      const d = new Date(sekarang);
+      d.setHours(p.hour, p.minute, 0, 0);
+      if (d.getTime() <= sekarang.getTime()) d.setDate(d.getDate() + 1);
+      return d;
+    }
+
+    case 'mingguan': {
+      const hari = p.pemicu.hariISO;
+      // Delapan, bukan tujuh: kalau hari ini memang harinya tetapi jamnya sudah
+      // lewat, jawabannya ada di putaran pekan berikutnya.
+      for (let i = 0; i < 8; i++) {
+        const d = new Date(
+          sekarang.getFullYear(),
+          sekarang.getMonth(),
+          sekarang.getDate() + i,
+          p.hour,
+          p.minute
+        );
+        if (hariISO(d) === hari && d.getTime() > sekarang.getTime()) return d;
+      }
+      return null;
+    }
+  }
+}
+
+/**
+ * Pengingat yang paling dekat akan berbunyi, untuk ditampilkan di layar.
+ *
+ * Membandingkan waktu nyalanya yang sebenarnya, bukan jamnya saja — lihat
+ * `waktuBerikutnya`.
  */
 export function pengingatBerikutnya(daftar: Pengingat[], sekarang: Date): Pengingat | null {
-  if (daftar.length === 0) return null;
-  const kini = sekarang.getHours() * 60 + sekarang.getMinutes();
-  const menit = (p: Pengingat) => p.hour * 60 + p.minute;
-  return daftar.find((p) => menit(p) > kini) ?? daftar[0];
+  let terbaik: Pengingat | null = null;
+  let paling = Infinity;
+
+  for (const p of daftar) {
+    const w = waktuBerikutnya(p, sekarang);
+    if (w && w.getTime() < paling) {
+      paling = w.getTime();
+      terbaik = p;
+    }
+  }
+  return terbaik;
 }
 
 export type StatusPemasangan = 'sehat' | 'sebagian' | 'hilang' | 'tak-relevan';

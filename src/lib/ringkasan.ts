@@ -22,6 +22,7 @@ import { labelJenisKelamin, labelOrgan, sistemDariOrgan } from '@/constants/klin
 import { SISTEM_GEJALA } from '@/constants/lupus';
 import { mundurHari, selisihHari, tanggalPendek } from '@/lib/dates';
 import { lamaSakit, usiaTahun } from '@/lib/klinis';
+import { labelPola } from '@/lib/pola-minum';
 import { PERTANYAAN_MENDESAK, PERTANYAAN_TANDA_BAHAYA } from '@/lib/redflag';
 import {
   isiTindakLanjut,
@@ -136,8 +137,14 @@ export interface ObatTerlewat {
   /** id baris `medications` — dua obat bisa punya nama sama. */
   id: string;
   nama: string;
-  /** Berapa kali diminum per hari. */
+  /** Berapa kali diminum pada tiap hari minum. */
   frekuensi: number;
+  /**
+   * Pola hari minum yang sudah siap dibaca, mis. "tiap Senin" atau
+   * "selang sehari". Dokter harus melihat metotreksat mingguan sebagai
+   * mingguan; "1x/hari" adalah salah baca yang berbahaya.
+   */
+  polaLabel: string;
   /** Dosis yang ditandai "belum diminum". */
   terlewat: number;
   /** Dosis yang ditandai "sudah diminum". */
@@ -221,7 +228,7 @@ export interface Ringkasan {
      * menjawab satu pertanyaan: sedang minum apa, apa yang berubah, seberapa
      * patuh. Dirakit di sini supaya layar dan versi teks tidak bisa berbeda.
      */
-    sedangDiminum: { id: string; nama: string; frekuensi: number }[];
+    sedangDiminum: { id: string; nama: string; frekuensi: number; polaLabel: string }[];
     perubahan: { id: string; nama: string; teks: string }[];
     dosis: {
       diminum: number;
@@ -848,6 +855,7 @@ function ringkasObat(
         id: m.id,
         nama: m.nama_obat,
         frekuensi: m.frekuensi ?? 1,
+        polaLabel: labelPola(m),
         aktif: m.aktif,
         perubahan: perubahanObat(m.id),
         terlewat: milik.filter((l) => l.diminum === false).length,
@@ -877,7 +885,7 @@ function ringkasObat(
     daftar: urut,
     sedangDiminum: urut
       .filter((o) => o.aktif)
-      .map((o) => ({ id: o.id, nama: o.nama, frekuensi: o.frekuensi })),
+      .map((o) => ({ id: o.id, nama: o.nama, frekuensi: o.frekuensi, polaLabel: o.polaLabel })),
     perubahan: urut
       .filter((o) => o.perubahan)
       .map((o) => ({ id: o.id, nama: o.nama, teks: o.perubahan })),
@@ -1143,7 +1151,7 @@ export function ringkasanTeks(r: Ringkasan): string {
     r.obat.sedangDiminum.length === 0
       ? '   - Sedang diminum: tidak ada obat aktif'
       : `   - Sedang diminum: ${r.obat.sedangDiminum
-          .map((o) => `${o.nama} (${o.frekuensi}x/hari)`)
+          .map((o) => `${o.nama} (${o.polaLabel})`)
           .join(', ')}`
   );
   if (r.obat.perubahan.length > 0) {

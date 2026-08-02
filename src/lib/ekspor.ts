@@ -35,6 +35,7 @@ import { skorLupusQol } from '@/lib/lupusqol';
 import { idPendek } from '@/lib/ringkasan';
 import { pisahkanDeskriptor } from '@/lib/sledai';
 import { nilaiDoris, nilaiLldas, skorKlinis } from '@/lib/target';
+import { polaObat } from '@/lib/pola-minum';
 import { jamRespons } from '@/lib/tindak-lanjut';
 import type {
   Alert,
@@ -251,7 +252,19 @@ export function rakitEkspor(semua: DataEkspor): BerkasCsv[] {
         { judul: 'obat_kode', ambil: (m) => idPendek(m.id) },
         { judul: 'nama_obat', ambil: (m) => m.nama_obat },
         { judul: 'dosis', ambil: (m) => m.dosis },
-        { judul: 'frekuensi_per_hari', ambil: (m) => m.frekuensi },
+        // Namanya "per hari minum", bukan "per hari": pada metotreksat
+        // mingguan angka ini berlaku pada hari Senin saja. Kolom `pola` di
+        // sebelahnya yang menentukan hari mana.
+        { judul: 'frekuensi_per_hari_minum', ambil: (m) => m.frekuensi },
+        { judul: 'pola', ambil: (m) => polaObat(m) },
+        // ISO: 1=Senin s/d 7=Minggu. Dipisah titik koma supaya satu sel CSV
+        // tetap utuh saat dibuka di Excel dengan pemisah koma.
+        {
+          judul: 'hari_minggu_iso',
+          ambil: (m) => (m.hari_minggu?.length ? m.hari_minggu.join(';') : null),
+        },
+        { judul: 'selang_hari', ambil: (m) => m.selang_hari },
+        { judul: 'mulai_tanggal', ambil: (m) => m.mulai_tanggal },
         { judul: 'aktif', ambil: (m) => m.aktif },
       ],
       urut(d.meds, (m) => [kode(m.patient_id), m.nama_obat])
@@ -519,7 +532,12 @@ function keterangan(d: DataEkspor): BerkasCsv {
     {
       kunci: 'penyebut_kepatuhan',
       nilai:
-        'baris dosis.csv hanya ada bila pasien mencatat; dosis terjadwal dihitung dari obat.csv (frekuensi) + obat_riwayat.csv (rentang aktif)',
+        'baris dosis.csv hanya ada bila pasien mencatat; dosis terjadwal = jumlah HARI MINUM dalam rentang aktif (obat_riwayat.csv) x frekuensi_per_hari_minum. Hari minum ditentukan kolom pola: harian=tiap hari, mingguan=hari_minggu_iso, selang=tiap selang_hari sejak mulai_tanggal',
+    },
+    {
+      kunci: 'hari_minggu_iso',
+      nilai:
+        'ISO 1=Senin s/d 7=Minggu, dipisah titik koma. BUKAN penomoran R/SPSS yang lazim memulai dari Minggu',
     },
     {
       kunci: 'lupusqol',

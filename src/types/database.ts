@@ -54,13 +54,33 @@ export type Medication = {
   nama_obat: string;
   dosis: string | null;
   jadwal: string | null;
-  /** Berapa kali diminum per hari (1–6). Lihat supabase/obat_frekuensi_dan_riwayat.sql. */
+  /**
+   * Berapa kali diminum pada SETIAP HARI MINUM (1–6) — bukan per hari kalender.
+   * Untuk obat mingguan, ini jumlah dosis pada hari minumnya saja.
+   * Lihat supabase/obat_frekuensi_dan_riwayat.sql.
+   */
   frekuensi: number;
   /**
    * Jam minum per dosis, 'HH:MM' 24 jam, urut mengikuti `MedLog.slot`.
    * Dasar pengingat — lihat supabase/pengingat_obat.sql. NULL = tanpa pengingat.
    */
   jam: string[] | null;
+  /**
+   * Pola hari minum: 'harian' | 'mingguan' | 'selang'.
+   * Lihat src/lib/pola-minum.ts dan supabase/obat_pola_minum.sql.
+   */
+  pola: string;
+  /**
+   * Untuk pola 'mingguan': hari minum menurut ISO, 1 = Senin … 7 = Minggu.
+   *
+   * ⚠️ Bukan penomoran JavaScript (`getDay()`: 0 = Minggu) dan bukan penomoran
+   * expo-notifications (1 = Minggu). Penerjemahannya ada di `pola-minum.ts`.
+   */
+  hari_minggu: number[] | null;
+  /** Untuk pola 'selang': tiap berapa hari (2–30). 2 = selang sehari. */
+  selang_hari: number | null;
+  /** Untuk pola 'selang': tanggal jangkar 'YYYY-MM-DD' yang dihitung sebagai hari minum. */
+  mulai_tanggal: string | null;
   /** Keadaan sekarang saja; riwayatnya ada di `medication_events`. */
   aktif: boolean;
   created_at: string;

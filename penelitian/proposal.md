@@ -394,11 +394,23 @@ penghitungan baris catatan dosis, dengan alat ukur berkas `dosis.csv`. Hasil
 ukurnya berupa rasio bernilai 0 sampai 1, dengan skala rasio.
 
 Cakupan pencatatan didefinisikan sebagai jumlah dosis yang tercatat dibagi jumlah
-dosis yang terjadwal. Dosis terjadwal dihitung dari frekuensi harian tiap obat
-dikalikan jumlah hari obat tersebut aktif dalam periode pemantauan. Cara ukurnya
-adalah penggabungan berkas `obat.csv` yang memuat frekuensi dan berkas
-`obat_riwayat.csv` yang memuat tanggal mulai serta tanggal berhenti tiap obat.
-Hasil ukurnya berupa rasio bernilai 0 sampai 1, dengan skala rasio.
+dosis yang terjadwal. Dosis terjadwal dihitung dari jumlah hari minum tiap obat
+dalam periode pemantauan dikalikan frekuensi minum pada setiap hari minum
+tersebut. Hari minum ditentukan oleh pola minum obat yang bersangkutan, yaitu
+setiap hari untuk pola harian, hari tertentu dalam seminggu untuk pola mingguan,
+dan setiap sekian hari terhitung sejak tanggal mulai untuk pola selang. Cara
+ukurnya adalah penggabungan berkas `obat.csv` yang memuat pola minum beserta
+frekuensinya dan berkas `obat_riwayat.csv` yang memuat tanggal mulai serta
+tanggal berhenti tiap obat. Hasil ukurnya berupa rasio bernilai 0 sampai 1,
+dengan skala rasio.
+
+Pembedaan pola minum tersebut bukan perincian teknis. Metotreksat merupakan obat
+yang lazim dipakai pada lupus eritematosus sistemik dan diminum sekali seminggu,
+sedangkan sebagian peserta menerima glukokortikoid dengan aturan selang sehari.
+Apabila dosis terjadwal dihitung sebagai frekuensi harian dikalikan jumlah hari
+aktif, metotreksat mingguan akan tercatat memiliki tiga puluh dosis terjadwal
+dalam satu bulan padahal hanya empat, sehingga cakupan pencatatan peserta yang
+bersangkutan tampak sangat rendah tanpa sebab yang sebenarnya ada.
 
 Kedua ukuran kepatuhan tersebut dilaporkan terpisah, sebab penyebutnya berbeda.
 Aplikasi membuat baris catatan dosis hanya pada saat peserta mengetuknya, bukan

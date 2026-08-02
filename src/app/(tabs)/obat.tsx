@@ -22,6 +22,14 @@ import { DISCLAIMER } from '@/constants/consent';
 import { tanggalPendek, todayISO } from '@/lib/dates';
 import { tutupPengingatDosis } from '@/lib/notifikasi';
 import { bacaJam, sesuaikanJam } from '@/lib/pengingat';
+import {
+  drafKeKolom,
+  drafPolaBawaan,
+  periksaDrafPola,
+  PilihPola,
+  type DrafPola,
+} from '@/components/pilih-pola';
+import { jatuhPada, labelPola, tanggalMinumBerikutnya } from '@/lib/pola-minum';
 import { useSession } from '@/lib/session';
 import { supabase } from '@/lib/supabase';
 import type { MedLog, Medication, MedicationEvent } from '@/types/database';
@@ -40,10 +48,20 @@ const FREKUENSI = [
  */
 const kunciDosis = (medicationId: string, slot: number) => `${medicationId}|${slot}`;
 
+/** Date → 'YYYY-MM-DD' setempat, untuk diberikan ke `tanggalPendek`. */
+function isoDari(d: Date): string {
+  const bulan = String(d.getMonth() + 1).padStart(2, '0');
+  const hari = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${bulan}-${hari}`;
+}
+
 /** Tabel/kolom baru belum tentu ada di project Supabase lama. */
 function pesanSkemaObat(pesan: string): string {
   if (/\bjam\b/.test(pesan)) {
     return 'Kolom jam minum belum ada di database. Jalankan supabase/pengingat_obat.sql lebih dulu.';
+  }
+  if (/\bpola\b|hari_minggu|selang_hari|mulai_tanggal/.test(pesan)) {
+    return 'Kolom pola minum belum ada di database. Jalankan supabase/obat_pola_minum.sql di SQL Editor.';
   }
   return /frekuensi|slot|medication_events/.test(pesan)
     ? 'Skema obat di Supabase belum diperbarui. Jalankan supabase/obat_frekuensi_dan_riwayat.sql di SQL Editor.'
@@ -66,6 +84,10 @@ export default function ObatScreen() {
   const [frekuensi, setFrekuensi] = useState(1);
   const [jamId, setJamId] = useState<string | null>(null);
   const [jamDraf, setJamDraf] = useState<string[]>([]);
+  /** Pola pada formulir tambah obat. */
+  const [polaBaru, setPolaBaru] = useState<DrafPola>(drafPolaBawaan());
+  /** Pola pada panel jadwal kartu obat yang sedang dibuka. */
+  const [polaDraf, setPolaDraf] = useState<DrafPola>(drafPolaBawaan());
   /** id obat yang sedang ditanyai alasan berhentinya. */
   const [hentikanId, setHentikanId] = useState<string | null>(null);
   const [alasanHenti, setAlasanHenti] = useState('');
@@ -189,6 +211,11 @@ export default function ObatScreen() {
       setErr('Nama obat wajib diisi.');
       return;
     }
+    const salahPola = periksaDrafPola(polaBaru);
+    if (salahPola) {
+      setErr(salahPola);
+      return;
+    }
     setBusy(true);
     const { data, error } = await supabase
       .from('medications')
@@ -198,6 +225,7 @@ export default function ObatScreen() {
         dosis: dosis.trim() || null,
         jadwal: jadwal.trim() || null,
         frekuensi,
+        ...drafKeKolom(polaBaru),
         // Jam bawaan langsung diisi supaya pengingat bekerja tanpa perlu
         // satu langkah pengaturan lagi. Formulir tambah obat sengaja tidak
         // menanyakannya: pasien yang baru menambah obat belum tentu tahu
@@ -228,6 +256,7 @@ export default function ObatScreen() {
     setDosis('');
     setJadwal('');
     setFrekuensi(1);
+    setPolaBaru(drafPolaBawaan());
     setTambah(false);
     await muat();
   }
@@ -295,6 +324,20 @@ export default function ObatScreen() {
     return isi.length === 0 ? 'belum diatur' : isi.join(', ');
   }
 
+  /** Kolom pola sebuah obat → draf yang bisa disunting. */
+  function drafDariObat(med: Medication): DrafPola {
+    const pola = med.pola === 'mingguan' || med.pola === 'selang' ? med.pola : 'harian';
+    return {
+      pola,
+      hariMinggu: med.hari_minggu ?? [],
+      selangHari: String(med.selang_hari ?? 2),
+      // Obat lama tidak punya jangkar. Memakai hari ini berarti pasien yang
+      // baru mengubahnya jadi selang-sehari mulai dihitung dari hari ini,
+      // bukan dari tanggal yang tidak pernah ia tentukan.
+      mulaiTanggal: med.mulai_tanggal ?? hariIni,
+    };
+  }
+
   async function simpanJam(med: Medication) {
     setErr(null);
     // Yang kosong disimpan sebagai string kosong, bukan dibuang: posisi tiap
@@ -307,7 +350,16 @@ export default function ObatScreen() {
       return;
     }
 
-    const { error } = await supabase.from('medications').update({ jam: bersih }).eq('id', med.id);
+    const salahPola = periksaDrafPola(polaDraf);
+    if (salahPola) {
+      setErr(salahPola);
+      return;
+    }
+
+    const { error } = await supabase
+      .from('medications')
+      .update({ jam: bersih, ...drafKeKolom(polaDraf) })
+      .eq('id', med.id);
 
     if (error) {
       setErr(pesanSkemaObat(`Gagal menyimpan jam: ${error.message}`));
@@ -351,10 +403,17 @@ export default function ObatScreen() {
 
   if (loading) return <Loading />;
 
-  const totalDosis = meds.reduce((n, m) => n + (m.frekuensi ?? 1), 0);
+  const sekarang = new Date();
+  // Obat mingguan dan selang-hari TIDAK dihitung pada hari yang bukan hari
+  // minumnya. Tanpa penyaringan ini, penyebutnya ikut menghitung metotreksat
+  // setiap hari, dan pasien membaca "0 dari 3" pada hari ia sudah minum semua
+  // obat yang memang harus diminum.
+  const medsHariIni = meds.filter((m) => jatuhPada(m, sekarang));
+
+  const totalDosis = medsHariIni.reduce((n, m) => n + (m.frekuensi ?? 1), 0);
   // Hanya obat yang sedang diminum: obat yang dihentikan hari ini bisa punya
   // catatan hari ini juga, dan akan membuat hitungannya melebihi totalnya.
-  const sudah = meds.reduce(
+  const sudah = medsHariIni.reduce(
     (n, m) =>
       n +
       Array.from({ length: m.frekuensi ?? 1 }, (_, i) => i).filter(
@@ -377,7 +436,9 @@ export default function ObatScreen() {
         <Text style={styles.ringkas}>
           {meds.length === 0
             ? 'Belum ada obat yang sedang diminum.'
-            : `${sudah} dari ${totalDosis} dosis sudah ditandai diminum.`}
+            : totalDosis === 0
+              ? 'Tidak ada obat yang dijadwalkan hari ini.'
+              : `${sudah} dari ${totalDosis} dosis sudah ditandai diminum.`}
         </Text>
       </Card>
 
@@ -385,13 +446,15 @@ export default function ObatScreen() {
 
       {meds.map((m) => {
         const n = m.frekuensi ?? 1;
+        const hariMinum = jatuhPada(m, sekarang);
+        const berikutnya = hariMinum ? null : tanggalMinumBerikutnya(m, sekarang);
         return (
           <Card key={m.id}>
             <View style={styles.medHead}>
               <View style={styles.medInfo}>
                 <Text style={styles.medNama}>{m.nama_obat}</Text>
                 <Text style={styles.medMeta}>
-                  {[m.dosis, `${n}x sehari`, m.jadwal].filter(Boolean).join(' · ')}
+                  {[m.dosis, labelPola(m), m.jadwal].filter(Boolean).join(' · ')}
                 </Text>
               </View>
               <View style={styles.aksiKanan}>
@@ -415,16 +478,18 @@ export default function ObatScreen() {
               onPress={() => {
                 setJamId(jamId === m.id ? null : m.id);
                 setJamDraf(sesuaikanJam(m.jam, n));
+                setPolaDraf(drafDariObat(m));
               }}
               hitSlop={8}
             >
               <Text style={styles.aturJam}>
-                {jamId === m.id ? 'Tutup pengaturan jam' : `Jam minum: ${ringkasJam(m, n)}`}
+                {jamId === m.id ? 'Tutup pengaturan jadwal' : `Jadwal: ${ringkasJam(m, n)}`}
               </Text>
             </Pressable>
 
             {jamId === m.id && (
               <View style={styles.formHenti}>
+                <PilihPola nilai={polaDraf} onChange={setPolaDraf} />
                 {jamDraf.map((j, i) => (
                   <Field
                     key={i}
@@ -493,39 +558,54 @@ export default function ObatScreen() {
             )}
 
             {/*
+              Hari yang bukan hari minum TIDAK diberi kotak centang.
+              Menampilkannya berarti mengundang pasien mencatat dosis
+              metotreksat pada hari Rabu — catatan yang salah, dan pada
+              obat seperti metotreksat, dorongan untuk meminumnya di hari
+              yang keliru.
+            */}
+            {!hariMinum && (
+              <Text style={styles.bukanHariMinum}>
+                Tidak dijadwalkan hari ini
+                {berikutnya ? ` · berikutnya ${tanggalPendek(isoDari(berikutnya))}` : ''}
+              </Text>
+            )}
+
+            {/*
               Satu baris centang per dosis: obat 3x sehari perlu tiga tanda.
               Seluruh barisnya yang bisa diketuk, bukan kotak kecilnya saja —
               sasaran ketuk setinggi 44pt, sesuai baris obat lain.
             */}
-            {Array.from({ length: n }, (_, i) => i).map((slot) => {
-              const log = logs[kunciDosis(m.id, slot)];
-              const sudah = log?.diminum === true;
-              return (
-                <Pressable
-                  key={slot}
-                  accessibilityRole="checkbox"
-                  accessibilityState={{ checked: sudah }}
-                  accessibilityLabel={
-                    n > 1 ? `${m.nama_obat} dosis ke-${slot + 1}` : `${m.nama_obat} sudah diminum`
-                  }
-                  onPress={() => void tandai(m, slot, !sudah)}
-                  style={({ pressed }) => [
-                    styles.dosisBaris,
-                    sudah && styles.dosisBarisOn,
-                    pressed && styles.dosisBarisPressed,
-                  ]}
-                >
-                  <View style={[styles.kotak, sudah && styles.kotakOn]}>
-                    {sudah && <Ionicons name="checkmark" size={15} color="#fff" />}
-                  </View>
-                  <Text style={[styles.dosisLabel, sudah && styles.dosisLabelOn]}>
-                    {n > 1 ? `Dosis ke-${slot + 1}` : 'Sudah diminum hari ini'}
-                    {bacaJam(m.jam?.[slot]) ? ` · ${m.jam![slot]}` : ''}
-                  </Text>
-                  {log?.diminum === false && <Text style={styles.belum}>ditandai belum</Text>}
-                </Pressable>
-              );
-            })}
+            {hariMinum &&
+              Array.from({ length: n }, (_, i) => i).map((slot) => {
+                const log = logs[kunciDosis(m.id, slot)];
+                const sudah = log?.diminum === true;
+                return (
+                  <Pressable
+                    key={slot}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: sudah }}
+                    accessibilityLabel={
+                      n > 1 ? `${m.nama_obat} dosis ke-${slot + 1}` : `${m.nama_obat} sudah diminum`
+                    }
+                    onPress={() => void tandai(m, slot, !sudah)}
+                    style={({ pressed }) => [
+                      styles.dosisBaris,
+                      sudah && styles.dosisBarisOn,
+                      pressed && styles.dosisBarisPressed,
+                    ]}
+                  >
+                    <View style={[styles.kotak, sudah && styles.kotakOn]}>
+                      {sudah && <Ionicons name="checkmark" size={15} color="#fff" />}
+                    </View>
+                    <Text style={[styles.dosisLabel, sudah && styles.dosisLabelOn]}>
+                      {n > 1 ? `Dosis ke-${slot + 1}` : 'Sudah diminum hari ini'}
+                      {bacaJam(m.jam?.[slot]) ? ` · ${m.jam![slot]}` : ''}
+                    </Text>
+                    {log?.diminum === false && <Text style={styles.belum}>ditandai belum</Text>}
+                  </Pressable>
+                );
+              })}
           </Card>
         );
       })}
@@ -675,6 +755,12 @@ const styles = StyleSheet.create({
   dosisLabel: { flex: 1, fontSize: 13.5, fontWeight: '600', color: '#374151' },
   dosisLabelOn: { color: '#166534' },
   belum: { fontSize: 11, color: Brand.teksLembut },
+  bukanHariMinum: {
+    fontSize: 12.5,
+    color: Brand.teksLembut,
+    fontStyle: 'italic',
+    paddingVertical: space.xs,
+  },
   lamaBaris: {
     flexDirection: 'row',
     alignItems: 'center',

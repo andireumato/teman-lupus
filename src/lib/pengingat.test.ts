@@ -3,10 +3,12 @@ import {
   bacaJam,
   JAM_BAWAAN,
   MAKS_DOSIS,
+  KEJADIAN_SELANG_DI_MUKA,
   pengingatBerikutnya,
   rencanaPengingat,
   sesuaikanJam,
   tulisJam,
+  waktuBerikutnya,
 } from '@/lib/pengingat';
 import type { Medication } from '@/types/database';
 
@@ -20,6 +22,10 @@ function med(p: Partial<Medication> = {}): Medication {
     jadwal: null,
     frekuensi: 1,
     jam: null,
+    pola: 'harian',
+    hari_minggu: null,
+    selang_hari: null,
+    mulai_tanggal: null,
     aktif: true,
     created_at: '2026-01-01T00:00:00+07:00',
     ...p,
@@ -231,5 +237,122 @@ describe('diagnosaPengingat', () => {
     const d = diagnosaPengingat(5, 2);
     expect(d.direncanakan).toBe(5);
     expect(d.terpasang).toBe(2);
+  });
+});
+
+describe('rencanaPengingat — pola mingguan', () => {
+  // 3 Agustus 2026 adalah hari Senin.
+  const seninPagi = new Date(2026, 7, 3, 6, 0);
+
+  it('memasang satu pengingat berulang per hari yang dipilih', () => {
+    const r = rencanaPengingat(
+      [med({ pola: 'mingguan', hari_minggu: [1, 4], jam: ['08:00'] })],
+      seninPagi
+    );
+    expect(r).toHaveLength(2);
+    expect(r.map((p) => p.pemicu)).toEqual([
+      { jenis: 'mingguan', hariISO: 1 },
+      { jenis: 'mingguan', hariISO: 4 },
+    ]);
+  });
+
+  it('tidak memasang apa pun bila harinya belum dipilih', () => {
+    const r = rencanaPengingat(
+      [med({ pola: 'mingguan', hari_minggu: [], jam: ['08:00'] })],
+      seninPagi
+    );
+    expect(r).toHaveLength(0);
+  });
+
+  it('kuncinya berbeda per hari, supaya tidak saling menimpa', () => {
+    const r = rencanaPengingat(
+      [med({ id: 'mtx', pola: 'mingguan', hari_minggu: [1, 7], jam: ['08:00'] })],
+      seninPagi
+    );
+    expect(new Set(r.map((p) => p.kunci)).size).toBe(2);
+  });
+});
+
+describe('rencanaPengingat — pola selang', () => {
+  const seninPagi = new Date(2026, 7, 3, 6, 0);
+  const selang = () =>
+    med({ pola: 'selang', selang_hari: 2, mulai_tanggal: '2026-08-03', jam: ['08:00'] });
+
+  it('memasang kejadian bertanggal sebanyak KEJADIAN_SELANG_DI_MUKA', () => {
+    const r = rencanaPengingat([selang()], seninPagi);
+    expect(r).toHaveLength(KEJADIAN_SELANG_DI_MUKA);
+    expect(r.every((p) => p.pemicu.jenis === 'tanggal')).toBe(true);
+  });
+
+  it('jaraknya benar-benar dua hari', () => {
+    const r = rencanaPengingat([selang()], seninPagi);
+    const tanggal = r.map((p) => (p.pemicu as { tanggal: Date }).tanggal);
+    expect(tanggal[0].getDate()).toBe(3);
+    expect(tanggal[1].getDate()).toBe(5);
+    expect(tanggal[2].getDate()).toBe(7);
+  });
+
+  it('melewati kejadian yang jamnya sudah lewat hari ini', () => {
+    // Menjadwalkan notifikasi ke masa lalu membuatnya berbunyi seketika.
+    const seninSore = new Date(2026, 7, 3, 20, 0);
+    const r = rencanaPengingat([selang()], seninSore);
+    expect((r[0].pemicu as { tanggal: Date }).tanggal.getDate()).toBe(5);
+    expect(r.every((p) => (p.pemicu as { tanggal: Date }).tanggal > seninSore)).toBe(true);
+  });
+
+  it('tidak memasang apa pun sebelum tanggal mulai terlampaui mundur', () => {
+    const r = rencanaPengingat([selang()], new Date(2026, 6, 1, 6, 0));
+    expect(r).toHaveLength(KEJADIAN_SELANG_DI_MUKA);
+    expect((r[0].pemicu as { tanggal: Date }).tanggal.getMonth()).toBe(7); // Agustus
+  });
+});
+
+describe('waktuBerikutnya', () => {
+  const seninPagi = new Date(2026, 7, 3, 6, 0);
+
+  it('pola mingguan pada hari yang salah menunjuk ke pekan yang benar', () => {
+    // Inilah yang dulu salah: layar mengumumkan "berikutnya 08:00" pada hari Rabu.
+    const [p] = rencanaPengingat(
+      [med({ pola: 'mingguan', hari_minggu: [1], jam: ['08:00'] })],
+      seninPagi
+    );
+    const rabu = new Date(2026, 7, 5, 9, 0);
+    const w = waktuBerikutnya(p, rabu)!;
+    expect(w.getDate()).toBe(10); // Senin berikutnya
+    expect(w.getHours()).toBe(8);
+  });
+
+  it('pola mingguan pada harinya tetapi jamnya sudah lewat: pekan depan', () => {
+    const [p] = rencanaPengingat(
+      [med({ pola: 'mingguan', hari_minggu: [1], jam: ['08:00'] })],
+      seninPagi
+    );
+    const w = waktuBerikutnya(p, new Date(2026, 7, 3, 20, 0))!;
+    expect(w.getDate()).toBe(10);
+  });
+
+  it('pola harian berputar ke besok bila jamnya sudah lewat', () => {
+    const [p] = rencanaPengingat([med({ jam: ['08:00'] })], seninPagi);
+    expect(waktuBerikutnya(p, new Date(2026, 7, 3, 20, 0))!.getDate()).toBe(4);
+  });
+
+  it('pengingat bertanggal yang sudah lewat tidak punya waktu berikutnya', () => {
+    const [p] = rencanaPengingat(
+      [med({ pola: 'selang', selang_hari: 2, mulai_tanggal: '2026-08-03', jam: ['08:00'] })],
+      seninPagi
+    );
+    expect(waktuBerikutnya(p, new Date(2026, 8, 30))).toBeNull();
+  });
+
+  it('pengingatBerikutnya memilih yang paling dekat lintas pola', () => {
+    const daftar = rencanaPengingat(
+      [
+        med({ id: 'mtx', pola: 'mingguan', hari_minggu: [1], jam: ['08:00'] }),
+        med({ id: 'hcq', jam: ['07:00'] }),
+      ],
+      seninPagi
+    );
+    // Pukul 06.00 Senin: HCQ 07.00 lebih dekat daripada MTX 08.00.
+    expect(pengingatBerikutnya(daftar, seninPagi)!.medicationId).toBe('hcq');
   });
 });

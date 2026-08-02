@@ -20,6 +20,7 @@ import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
 import type { Pengingat } from '@/lib/pengingat';
+import { hariISOKeExpo } from '@/lib/pola-minum';
 
 /**
  * Versi channel, BUKAN sekadar nama.
@@ -185,13 +186,47 @@ export async function pasangPengingat(rencana: Pengingat[]): Promise<void> {
         body: p.isi,
         data: { jenis: JENIS_PENGINGAT_OBAT, medicationId: p.medicationId, slot: p.slot },
       },
-      trigger: {
+      trigger: pemicuKeTrigger(p),
+    });
+  }
+}
+
+/**
+ * Menerjemahkan pemicu murni jadi bentuk yang dimengerti expo-notifications.
+ *
+ * ⚠️ PENOMORAN HARI. `WEEKLY` memakai 1 = Minggu, sedangkan aplikasi ini
+ * menyimpan hari dengan ISO 1 = Senin. Penerjemahannya lewat `hariISOKeExpo`,
+ * bukan aritmetika di tempat — satu digit yang salah berarti pasien diingatkan
+ * meminum metotreksat pada hari yang keliru.
+ */
+function pemicuKeTrigger(p: Pengingat): Notifications.NotificationTriggerInput {
+  switch (p.pemicu.jenis) {
+    case 'harian':
+      return {
         type: Notifications.SchedulableTriggerInputTypes.DAILY,
         hour: p.hour,
         minute: p.minute,
         channelId: CHANNEL,
-      },
-    });
+      };
+
+    case 'mingguan':
+      return {
+        type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
+        weekday: hariISOKeExpo(p.pemicu.hariISO),
+        hour: p.hour,
+        minute: p.minute,
+        channelId: CHANNEL,
+      };
+
+    case 'tanggal':
+      // Sekali pakai. Pola selang tidak punya pemicu berulang di Android, jadi
+      // jadwalnya diisi ulang tiap layar Obat dibuka — lihat
+      // KEJADIAN_SELANG_DI_MUKA di pengingat.ts.
+      return {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date: p.pemicu.tanggal,
+        channelId: CHANNEL,
+      };
   }
 }
 
