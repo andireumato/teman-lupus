@@ -8,6 +8,8 @@
     "scheme": "temanlupus",
     "userInterfaceStyle": "automatic",
     "ios": {
+      "bundleIdentifier": "com.temanlupus.app",
+      "supportsTablet": true,
       "icon": "./assets/images/icon.png"
     },
     "android": {
