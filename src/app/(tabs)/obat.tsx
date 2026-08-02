@@ -34,13 +34,17 @@ import { useSession } from '@/lib/session';
 import { supabase } from '@/lib/supabase';
 import type { MedLog, Medication, MedicationEvent } from '@/types/database';
 
-/** Pilihan frekuensi; nilainya = jumlah dosis per hari. */
-const FREKUENSI = [
-  { v: 1, label: '1x sehari' },
-  { v: 2, label: '2x sehari' },
-  { v: 3, label: '3x sehari' },
-  { v: 4, label: '4x sehari' },
-];
+/**
+ * Pilihan frekuensi; nilainya = jumlah dosis pada setiap HARI MINUM.
+ *
+ * Labelnya ikut pola: "1x sehari" pada obat mingguan adalah keterangan yang
+ * salah — metotreksat 1x seminggu bukan 1x sehari, dan pasien yang membaca
+ * "sehari" bisa meminumnya tiap hari.
+ */
+function pilihanFrekuensi(pola: string) {
+  const satuan = pola === 'harian' ? 'sehari' : 'tiap hari minum';
+  return [1, 2, 3, 4].map((v) => ({ v, label: `${v}x ${satuan}` }));
+}
 
 /**
  * Kunci catatan satu dosis pada satu hari.
@@ -86,6 +90,8 @@ export default function ObatScreen() {
   const [jamDraf, setJamDraf] = useState<string[]>([]);
   /** Pola pada formulir tambah obat. */
   const [polaBaru, setPolaBaru] = useState<DrafPola>(drafPolaBawaan());
+  /** Jam pada formulir tambah obat, sudah terisi bawaan sejak awal. */
+  const [jamBaru, setJamBaru] = useState<string[]>(sesuaikanJam(null, 1));
   /** Pola pada panel jadwal kartu obat yang sedang dibuka. */
   const [polaDraf, setPolaDraf] = useState<DrafPola>(drafPolaBawaan());
   /** id obat yang sedang ditanyai alasan berhentinya. */
@@ -216,6 +222,11 @@ export default function ObatScreen() {
       setErr(salahPola);
       return;
     }
+    const jamSalah = jamBaru.filter((j) => j.trim() !== '' && !bacaJam(j));
+    if (jamSalah.length > 0) {
+      setErr(`Jam "${jamSalah[0].trim()}" tidak terbaca. Pakai format 24 jam seperti 07:30.`);
+      return;
+    }
     setBusy(true);
     const { data, error } = await supabase
       .from('medications')
@@ -226,12 +237,12 @@ export default function ObatScreen() {
         jadwal: jadwal.trim() || null,
         frekuensi,
         ...drafKeKolom(polaBaru),
-        // Jam bawaan langsung diisi supaya pengingat bekerja tanpa perlu
-        // satu langkah pengaturan lagi. Formulir tambah obat sengaja tidak
-        // menanyakannya: pasien yang baru menambah obat belum tentu tahu
-        // jamnya, dan menahan penyimpanan karenanya membuat obat itu tidak
-        // tercatat sama sekali. Bisa diubah kapan saja di kartu obatnya.
-        jam: sesuaikanJam(null, frekuensi),
+        // Formulirnya sudah terisi jam yang lazim sejak dibuka, jadi pasien
+        // yang belum tahu jamnya tetap bisa menyimpan tanpa terhalang — obat
+        // yang tidak tercatat sama sekali lebih buruk daripada obat dengan jam
+        // yang masih perlu disesuaikan. Yang dikosongkan disimpan sebagai
+        // string kosong agar posisinya tetap sejajar dengan nomor dosisnya.
+        jam: jamBaru.map((j) => (bacaJam(j) ? j.trim() : '')),
       })
       .select('id')
       .maybeSingle();
@@ -257,6 +268,7 @@ export default function ObatScreen() {
     setJadwal('');
     setFrekuensi(1);
     setPolaBaru(drafPolaBawaan());
+    setJamBaru(sesuaikanJam(null, 1));
     setTambah(false);
     await muat();
   }
@@ -620,13 +632,49 @@ export default function ObatScreen() {
             placeholder="mis. Hidroksiklorokuin"
           />
           <Field label="Dosis" value={dosis} onChangeText={setDosis} placeholder="mis. 200 mg" />
-          <Text style={styles.fieldLabel}>Berapa kali sehari</Text>
-          <Segmented options={FREKUENSI} value={frekuensi} onChange={setFrekuensi} />
+
+          {/*
+            Pola minum ditanyakan DI SINI, bukan ditunda ke kartu obat.
+            Jam punya nilai bawaan yang aman — salah jam berarti pengingatnya
+            meleset beberapa jam. Pola tidak punya padanan itu: menyimpan
+            metotreksat sebagai harian berarti mengingatkannya tujuh kali
+            seminggu, dan membuat penyebut kepatuhan di ekspor penelitian
+            salah tujuh kali lipat.
+          */}
+          <PilihPola nilai={polaBaru} onChange={setPolaBaru} />
+
+          <Text style={styles.fieldLabel}>
+            {polaBaru.pola === 'harian' ? 'Berapa kali sehari' : 'Berapa kali tiap hari minum'}
+          </Text>
+          <Segmented
+            options={pilihanFrekuensi(polaBaru.pola)}
+            value={frekuensi}
+            onChange={(v) => {
+              setFrekuensi(v);
+              setJamBaru((prev) => sesuaikanJam(prev, v));
+            }}
+          />
+
+          {jamBaru.map((j, i) => (
+            <Field
+              key={i}
+              label={frekuensi > 1 ? `Jam dosis ke-${i + 1}` : 'Jam minum'}
+              value={j}
+              onChangeText={(t) => setJamBaru((prev) => prev.map((x, k) => (k === i ? t : x)))}
+              placeholder="08:00"
+              autoCapitalize="none"
+              keyboardType="numbers-and-punctuation"
+            />
+          ))}
+          <Text style={styles.hint}>
+            Sudah diisi jam yang lazim — ubah bila perlu. Jam yang dikosongkan tidak diingatkan.
+          </Text>
+
           <Field
-            label="Waktu minum (opsional)"
+            label="Catatan waktu minum (opsional)"
             value={jadwal}
             onChangeText={setJadwal}
-            placeholder="mis. pagi & malam, sesudah makan"
+            placeholder="mis. sesudah makan"
           />
           <PrimaryButton label="Simpan obat" onPress={simpanObat} loading={busy} />
           <GhostButton label="Batal" onPress={() => setTambah(false)} />
