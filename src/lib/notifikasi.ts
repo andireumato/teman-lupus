@@ -101,19 +101,49 @@ async function siapkanChannel(): Promise<void> {
 }
 
 /**
- * Menutup pengingat yang sudah tampil dan mengosongkan angka di ikon.
+ * Menyetel angka di ikon aplikasi sesuai dosis yang belum dijawab.
  *
- * Notifikasi yang sudah berbunyi TIDAK hilang sendiri — ia menunggu di panel
- * notifikasi sampai disapu, dan ColorOS menghitungnya sebagai angka di ikon
- * aplikasi. Enam dosis sehari plus beberapa notifikasi uji dengan cepat
- * menumpuk jadi angka yang tidak jelas asalnya.
+ * BATAS YANG HARUS DIKETAHUI SEBELUM MEMPERCAYAI ANGKA INI.
  *
- * Dipanggil saat layar Obat dibuka: di sanalah kotak centang dosisnya berada,
- * jadi pengingatnya memang sudah selesai tugasnya.
+ * Aplikasi tidak dapat menyentuh ikonnya sendiri saat tidak berjalan. Angka ini
+ * hanya diperbarui ketika aplikasi terbuka, dan di antara dua pembukaan yang
+ * mengubah tampilan ikon hanyalah notifikasi pengingat yang terbit. Karena itu
+ * angkanya tepat setiap kali pasien membuka aplikasi, dan bisa tertinggal
+ * sesudahnya.
+ *
+ * Nol diperlakukan khusus: di dalam expo-notifications, `setBadgeCountAsync(0)`
+ * memanggil `notificationManager.cancelAll()`, sehingga ia SEKALIGUS menyapu
+ * seluruh notifikasi yang masih menunggu. Itu memang yang diinginkan di sini —
+ * tidak ada tunggakan berarti tidak ada yang perlu ditagih.
+ *
+ * Angkanya tidak muncul di semua ponsel. Android tidak punya badge angka baku;
+ * expo-notifications memakai ShortcutBadger, yang bekerja pada ColorOS, MIUI,
+ * dan One UI, tetapi tidak pada Pixel maupun Android murni — di sana hanya ada
+ * titik tanpa angka.
  */
-export async function bersihkanTampilan(): Promise<void> {
-  await Notifications.dismissAllNotificationsAsync();
-  await Notifications.setBadgeCountAsync(0);
+export async function setBadgeDosis(jumlah: number): Promise<void> {
+  await Notifications.setBadgeCountAsync(Math.max(0, jumlah));
+}
+
+/**
+ * Menutup notifikasi pengingat milik satu dosis tertentu.
+ *
+ * Dipanggil saat pasien menjawab dosisnya. Tanpa ini, pengingat yang sudah
+ * selesai tugasnya tetap menunggu di panel notifikasi dan tetap dihitung
+ * peluncur sebagai tunggakan — sehingga angka di ikon berselisih dengan
+ * kotak centang yang baru saja dicentang pasien.
+ *
+ * Hanya menyentuh notifikasi yang SUDAH TAMPIL, bukan yang masih terjadwal.
+ * Jadwal harian berikutnya tidak ikut terhapus.
+ */
+export async function tutupPengingatDosis(medicationId: string, slot: number): Promise<void> {
+  const tampil = await Notifications.getPresentedNotificationsAsync();
+  for (const n of tampil) {
+    const d = n.request.content.data;
+    if (d?.jenis === JENIS_PENGINGAT_OBAT && d?.medicationId === medicationId && d?.slot === slot) {
+      await Notifications.dismissNotificationAsync(n.request.identifier);
+    }
+  }
 }
 
 /**

@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useFocusEffect } from 'expo-router';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import {
   Card,
@@ -20,7 +20,8 @@ import { Brand, radius, space } from '@/constants/brand';
 import { PengingatCard } from '@/components/pengingat-card';
 import { DISCLAIMER } from '@/constants/consent';
 import { tanggalPendek, todayISO } from '@/lib/dates';
-import { bacaJam, sesuaikanJam } from '@/lib/pengingat';
+import { setBadgeDosis, tutupPengingatDosis } from '@/lib/notifikasi';
+import { bacaJam, dosisBelumDijawab, rencanaPengingat, sesuaikanJam } from '@/lib/pengingat';
 import { useSession } from '@/lib/session';
 import { supabase } from '@/lib/supabase';
 import type { MedLog, Medication, MedicationEvent } from '@/types/database';
@@ -169,8 +170,36 @@ export default function ObatScreen() {
     if (error) {
       setLogs(sebelumnya);
       setErr(pesanSkemaObat(`Gagal menyimpan: ${error.message}`));
+      return;
     }
+
+    // Pengingat dosis ini sudah selesai tugasnya. Dibiarkan menunggu di panel
+    // notifikasi, peluncur tetap menghitungnya sebagai tunggakan — sehingga
+    // angka di ikon berselisih dengan kotak centang yang baru saja dicentang.
+    void tutupPengingatDosis(med.id, slot);
   }
+
+  /**
+   * Angka di ikon aplikasi = dosis hari ini yang waktunya sudah lewat tetapi
+   * belum dijawab.
+   *
+   * Dihitung ulang setiap kali daftar obat atau catatan dosis berubah, jadi
+   * mencentang satu kotak langsung menurunkan angkanya. Sengaja diurus di sini,
+   * bukan di kartu pengingat: layar inilah yang memegang kedua bahannya, dan
+   * dua tempat yang menyetel angka yang sama adalah cara termudah membuat
+   * keduanya berselisih.
+   */
+  const belumDijawab = useMemo(() => {
+    const dijawab = Object.values(logs)
+      .filter((l) => l.diminum !== null && l.diminum !== undefined)
+      .map((l) => ({ medicationId: l.medication_id ?? '', slot: l.slot ?? 0 }));
+    return dosisBelumDijawab(rencanaPengingat(meds), dijawab, new Date());
+  }, [meds, logs]);
+
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+    void setBadgeDosis(belumDijawab);
+  }, [belumDijawab]);
 
   async function simpanObat() {
     if (!patientId) return;

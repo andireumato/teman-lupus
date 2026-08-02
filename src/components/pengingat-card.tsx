@@ -6,7 +6,6 @@ import { Platform, StyleSheet, Switch, Text, View } from 'react-native';
 import { Card, GhostButton, Msg, SectionLabel } from '@/components/ui/kit';
 import { Brand, space } from '@/constants/brand';
 import {
-  bersihkanTampilan,
   cekIzin,
   matikanPengingat,
   mintaIzin,
@@ -79,10 +78,11 @@ export function PengingatCard({ meds }: { meds: Medication[] }) {
 
   const sinkron = useCallback(async () => {
     if (!didukung) return;
-    // Pengingat yang sudah berbunyi menumpuk di panel notifikasi dan terhitung
-    // sebagai angka di ikon aplikasi. Layar Obat adalah tempat dosisnya
-    // dicentang, jadi di sinilah pengingatnya selesai tugasnya.
-    await bersihkanTampilan();
+    // Angka di ikon SENGAJA tidak disentuh di sini. Sejak 2 Agustus 2026 ia
+    // berarti "dosis yang belum dijawab", dan yang memegang hitungannya adalah
+    // layar Obat — lihat `belumDijawab` di app/(tabs)/obat.tsx. Menolkannya di
+    // sini akan menghapus tunggakan yang sebenarnya masih ada, tepat pada saat
+    // pasien membuka layarnya.
     const [simpan, status] = await Promise.all([AsyncStorage.getItem(KUNCI), cekIzin()]);
     setAktif(simpan === '1');
     setIzin(status);

@@ -185,3 +185,40 @@ export function diagnosaPengingat(direncanakan: number, terpasang: number): Diag
     pesan: `Baru ${terpasang} dari ${direncanakan} pengingat yang tersimpan di sistem.`,
   };
 }
+
+/** Dosis yang sudah dijawab pasien hari ini, diminum maupun tidak. */
+export interface DosisDijawab {
+  medicationId: string;
+  slot: number;
+}
+
+/**
+ * Dosis hari ini yang waktunya SUDAH LEWAT tetapi belum dijawab pasien.
+ *
+ * Inilah angka yang pantas muncul di ikon aplikasi. Tiga keputusan di dalamnya:
+ *
+ * 1. Hanya yang waktunya sudah lewat. Dosis pukul 19.00 bukan tunggakan pada
+ *    pukul 09.00, dan ikon yang sejak pagi menunjukkan angka tiga hanya
+ *    mengajari pasien mengabaikannya.
+ *
+ * 2. "Dijawab", bukan "diminum". Pasien yang menandai TIDAK meminum obatnya
+ *    sudah menjawab, dan menagihnya lagi lewat ikon adalah menegur orang yang
+ *    justru sudah jujur.
+ *
+ * 3. Dihitung dari rencana, bukan dari notifikasi yang menumpuk. Notifikasi
+ *    bisa tersapu tanpa dosisnya dijawab, dan bisa pula tertinggal padahal
+ *    dosisnya sudah dicentang.
+ */
+export function dosisBelumDijawab(
+  rencana: Pengingat[],
+  dijawab: DosisDijawab[],
+  sekarang: Date
+): number {
+  const menitSekarang = sekarang.getHours() * 60 + sekarang.getMinutes();
+  const sudah = new Set(dijawab.map((d) => `${d.medicationId}|${d.slot}`));
+
+  return rencana.filter((p) => {
+    const lewat = p.hour * 60 + p.minute <= menitSekarang;
+    return lewat && !sudah.has(`${p.medicationId}|${p.slot}`);
+  }).length;
+}
