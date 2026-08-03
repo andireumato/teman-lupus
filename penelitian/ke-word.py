@@ -41,9 +41,11 @@ UKURAN_KECIL = Pt(10)
 INDEN = Cm(1.25)
 MERAH = RGBColor(0xC0, 0x00, 0x00)
 
-# Blok "Catatan pengerjaan" pada naskah diganti gambar yang sesungguhnya.
-# Kunci = potongan nama berkas yang disebut di dalam catatan itu.
+# Gambar disisipkan pada akhir sub bab yang merujuknya. Naskah sengaja tidak
+# memuat penanda gambar apa pun, supaya isinya tetap bersih dibaca sebagai teks.
 GAMBAR_SETELAH_SUBBAB = {
+    '2.8 Kerangka Teori': ['gambar-2-1'],
+    '2.9 Kerangka Konsep': ['gambar-2-2'],
     '3.12 Alur Penelitian': ['gambar-3-1', 'gambar-3-2'],
 }
 
