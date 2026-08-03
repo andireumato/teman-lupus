@@ -20,38 +20,92 @@
 
 ## 1.1 Latar Belakang
 
-Lupus eritematosus sistemik (LES) merupakan penyakit autoimun kronik dengan
-perjalanan kambuh dan reda yang menyerang terutama perempuan usia produktif.
-Penilaian menyeluruh pada LES menuntut tiga hal sekaligus, yaitu aktivitas
-penyakit, kerusakan kumulatif, dan kualitas hidup yang dilaporkan pasien.
+Lupus eritematosus sistemik (LES) merupakan penyakit autoimun kronik yang
+menyerang banyak organ sekaligus dan berjalan dalam pergantian antara periode
+tenang dan kekambuhan. Penyakit ini menimpa terutama perempuan usia produktif,
+sehingga beban yang ditimbulkannya jatuh pada kelompok usia yang sedang
+menempuh pendidikan, bekerja, dan membangun keluarga. Prevalensi serta beratnya
+penyakit berbeda menurut wilayah dan kelompok etnik, dan kesenjangan sosial
+ekonomi memperburuk luaran pada kelompok yang kurang beruntung (Carter et al.,
+2016).
 
-Terdapat tiga persoalan mendasar yang melatarbelakangi penelitian ini.
+Data nasional Indonesia belum tersedia, namun registri rumah sakit rujukan sudah
+cukup menggambarkan keadaannya. Registri Lupus Hasan Sadikin di Bandung mencatat
+813 pasien dengan rerata usia saat diagnosis 27,7 tahun, dan 95,6% di antaranya
+perempuan. Dari jumlah tersebut, 8,1% pasien meninggal dengan infeksi sebagai
+penyebab kematian terbanyak, yaitu 36,4% dari seluruh kematian, dan tuberkulosis
+dijumpai pada 11,4% pasien (Hamijoyo et al., 2019). Beban infeksi tersebut
+berkaitan erat dengan paparan glukokortikoid, sebagaimana ditegaskan telaah
+sistematik global mengenai tuberkulosis pada LES (Darmawan et al., 2024).
+Kenyataan itu menempatkan penurunan dosis glukokortikoid sebagai kepentingan
+klinis yang nyata di Indonesia, bukan sekadar sasaran teoretis.
 
-Pertama, data antara dua kunjungan tidak terekam. Aktivitas penyakit dinilai
-saat kunjungan poliklinik, sementara gejala berfluktuasi harian. Pasien diminta
-mengingat kembali keluhan berminggu-minggu, dan ingatan itu cenderung bias
-terhadap keadaan terakhir.
+Registri yang sama memuat satu angka yang secara langsung melatarbelakangi
+penelitian ini, yaitu hanya 64,2% pasien yang menjalani kontrol secara teratur
+(Hamijoyo et al., 2019). Lebih dari sepertiga pasien terputus dari pemantauan,
+dan pada pasien tersebut perjalanan penyakitnya tidak diketahui sama sekali di
+antara kunjungan yang jarang.
+
+Terdapat tiga persoalan mendasar yang timbul dari keadaan tersebut.
+
+Pertama, apa yang terjadi di antara dua kunjungan tidak terekam. Aktivitas
+penyakit dinilai saat kunjungan poliklinik dengan instrumen yang jendela
+waktunya hanya sepuluh hari (Gladman et al., 2002), sedangkan gejala berfluktuasi
+harian. Pasien diminta mengingat kembali keluhan berminggu-minggu, dan ingatan
+mengenai gejala yang berfluktuasi cenderung condong pada keadaan terakhir.
+Akibatnya, penilaian yang menjadi dasar keputusan pengobatan bersandar pada
+sumber yang diketahui bias.
 
 Kedua, kepatuhan minum obat sulit dinilai secara objektif dalam praktik rutin,
 padahal ketidakpatuhan merupakan penyebab kekambuhan yang dapat dicegah.
+Penelitian yang memakai tiga cara pengukuran sekaligus mendapati 65% peserta
+tidak patuh menurut sekurang-kurangnya satu cara (Semo-Oz et al., 2022), dan
+kadar hidroksiklorokuin darah yang rendah berkaitan dengan penyakit yang aktif
+(Blanchet et al., 2020). Tanpa pengetahuan mengenai kepatuhan, penyakit yang
+sebenarnya tidak diobati akan tampak sebagai penyakit yang sukar dikendalikan,
+dan klinisi cenderung menaikkan dosis atau mengganti obat. Pada latar endemis
+tuberkulosis, penambahan imunosupresi yang tidak diperlukan itu membawa risiko
+tersendiri.
 
-Ketiga, target terapi modern belum banyak diukur di Indonesia. *Definition Of
-Remission In SLE* (DORIS) 2021 dan *Lupus Low Disease Activity State* (LLDAS)
-telah menjadi luaran baku dalam penelitian LES internasional (van Vollenhoven et
-al., 2021; Parra Sánchez et al., 2023), tetapi data capaiannya pada populasi
-Indonesia masih terbatas. Sebagian besar publikasi Indonesia tentang LES masih
-berfokus pada gambaran klinis dan laboratoris (Ginayah et al., 2025).
+Ketiga, target terapi modern menuntut pengamatan yang lebih rapat daripada yang
+tersedia. *Definition Of Remission In SLE* (DORIS) 2021 dan *Lupus Low Disease
+Activity State* (LLDAS) telah menjadi luaran baku dalam penelitian LES
+internasional (van Vollenhoven et al., 2021; Parra Sánchez et al., 2023), dan
+LLDAS yang bertahan sekurang-kurangnya tiga bulan terbukti menurunkan akrual
+kerusakan organ maupun kekambuhan (Golder et al., 2024). Namun 24% pasien pada
+kohort multinasional tidak pernah sekali pun mencapai LLDAS, dan keadaan
+tersebut berkaitan dengan rasio hazard kematian 4,98 (Kandane-Rathnayake et al.,
+2022). Data capaian target pada populasi Indonesia masih terbatas, dan sebagian
+besar publikasi Indonesia mengenai LES masih berfokus pada gambaran klinis serta
+laboratoris pada satu titik waktu (Ginayah et al., 2025).
 
-Aplikasi pendamping digital berpotensi menutup ketiga persoalan tersebut. Namun
-sebelum dinilai apakah sebuah aplikasi memperbaiki luaran klinis, harus
+Aplikasi pendamping digital berpotensi menutup ketiga persoalan tersebut melalui
+pencatatan harian yang dilakukan pasien sendiri, catatan kepatuhan berbasis
+dosis, dan pengenalan dini tanda bahaya. Kenyataan mutu aplikasi yang beredar
+masih jauh dari harapan. Telaah sistematik mendapati hanya 20 aplikasi LES yang
+memenuhi syarat dari 324 yang ditemukan, dengan rerata skor *Mobile App Rating
+Scale* 2,3 dari 5, dan dari 1.147 kajian yang teridentifikasi hanya dua berupa
+uji acak terkendali (Dantas et al., 2020). Penilaian independen yang lebih baru
+memperoleh gambaran serupa (Ramasamy et al., 2022). Seluruh kajian tersebut
+berasal dari negara berpendapatan tinggi, dan tidak satu pun aplikasi yang
+ditelaah berbahasa Indonesia maupun disesuaikan dengan alur pelayanan di
+Indonesia.
+
+Sebelum dinilai apakah sebuah aplikasi memperbaiki luaran klinis, harus
 dipastikan lebih dahulu bahwa pasien bersedia dan mampu memakainya secara
-berkelanjutan. Pertanyaan itulah yang dijawab penelitian ini.
+berkelanjutan. Aplikasi yang berhenti dipakai pada minggu kedua tidak
+menghasilkan data pemantauan, tidak memperbaiki kepatuhan, dan tidak menutup
+kesenjangan informasi mana pun. Pertanyaan kelayakan dan penerimaan itulah yang
+harus dijawab lebih dahulu, dan pertanyaan itulah yang dijawab penelitian ini.
 
 Pendekatan yang dipilih adalah studi kelayakan dan penerimaan pada kohort
 terbatas, dengan aktivitas penyakit sebagai luaran sekunder. Pendekatan ini
 lazim dipakai sebagai tahap pertama pengembangan alat kesehatan digital karena
 tidak menuntut jumlah kejadian tertentu, sehingga tidak gagal hanya karena
-peristiwa yang diamati terlalu jarang.
+peristiwa yang diamati terlalu jarang. Pengalaman pengembangan aplikasi LES yang
+melibatkan penggunanya sejak awal menunjukkan bahwa penerimaan yang baik
+diperoleh justru melalui tahap ini, bukan melewatinya (Deck et al., 2025;
+Guardino et al., 2024).
 
 ## 1.2 Rumusan Masalah
 
@@ -104,9 +158,12 @@ serta bahan komunikasi yang lebih terarah saat kontrol.
 ## 1.5 Orisinalitas
 
 Penelusuran kepustakaan tidak menemukan penelitian yang menilai kelayakan
-aplikasi pendamping digital khusus LES pada populasi Indonesia. Penelitian
-Indonesia yang tersedia memakai instrumen baku dalam bentuk kertas pada satu
-titik waktu (Ginayah et al., 2025), bukan pemantauan mandiri berkelanjutan.
+aplikasi pendamping digital khusus LES pada populasi Indonesia. Dua telaah
+sistematik yang menyisir seluruh aplikasi LES pada Google Play dan App Store
+tidak memuat satu pun aplikasi berbahasa Indonesia (Dantas et al., 2020;
+Ramasamy et al., 2022). Penelitian Indonesia yang tersedia memakai instrumen
+baku dalam bentuk kertas pada satu titik waktu (Ginayah et al., 2025), bukan
+pemantauan mandiri berkelanjutan.
 
 Tiga hal berikut membedakan penelitian ini.
 
