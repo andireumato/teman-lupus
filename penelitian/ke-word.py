@@ -4,7 +4,10 @@ proposal.md → proposal.docx dengan format Panduan Penulisan Disertasi FK USU.
 
 Dijalankan dari akar proyek:
 
-    python3 penelitian/ke-word.py
+    python3 penelitian/ke-word.py                              # proposal.md
+    python3 penelitian/ke-word.py penelitian/berkas-lain.md    # berkas lain
+
+Hasilnya bernama sama dengan sumbernya, berakhiran .docx.
 
 Yang DIKERJAKAN skrip ini: tata huruf, spasi, batas tepi, gaya judul bab dan
 sub bab, tabel bergaris atas-bawah saja, gambar tersemat beserta keterangannya,
@@ -29,9 +32,12 @@ from docx.oxml.ns import qn
 from docx.shared import Cm, Pt, RGBColor
 
 AKAR = Path(__file__).resolve().parent
-SUMBER = AKAR / 'proposal.md'
-HASIL = AKAR / 'proposal.docx'
 GAMBAR = AKAR / 'gambar'
+
+# Sumber bawaan adalah proposal; berkas lain bisa diberikan lewat argumen,
+# misalnya `python3 penelitian/ke-word.py penelitian/contoh-tabel-hasil.md`.
+SUMBER = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else AKAR / 'proposal.md'
+HASIL = SUMBER.with_suffix('.docx')
 
 # Panduan FK USU bagian 3: Times New Roman 12, judul tabel/gambar 10.
 FONT = 'Times New Roman'
@@ -122,7 +128,7 @@ def garis_atas_bawah(tabel) -> None:
             tcPr.append(borders)
 
 
-def tulis_inline(par, teks: str, merah: bool = False) -> None:
+def tulis_inline(par, teks: str, merah: bool = False, tebal: bool = False) -> None:
     """
     Menerjemahkan **tebal**, *miring*, dan `berkas` menjadi runs.
 
@@ -145,6 +151,8 @@ def tulis_inline(par, teks: str, merah: bool = False) -> None:
         r.font.size = UKURAN
         if merah:
             r.font.color.rgb = MERAH
+        if tebal:
+            r.bold = True
 
 
 def paragraf(doc, teks, *, inden=True, rata=WD_ALIGN_PARAGRAPH.JUSTIFY, merah=False):
@@ -214,11 +222,12 @@ def sisipkan_tabel(doc, baris_md, nomor_judul):
     isi = [k for k in kolom if not all(re.fullmatch(r':?-{2,}:?', s) for s in k)]
 
     # Judul tabel di ATAS tabel, diakhiri titik, 1 spasi, 10 pt.
-    j = doc.add_paragraph()
-    j.paragraph_format.line_spacing_rule = WD_LINE_SPACING.SINGLE
-    r = j.add_run(nomor_judul)
-    r.font.name = FONT
-    r.font.size = UKURAN_KECIL
+    if nomor_judul:
+        j = doc.add_paragraph()
+        j.paragraph_format.line_spacing_rule = WD_LINE_SPACING.SINGLE
+        r = j.add_run(nomor_judul)
+        r.font.name = FONT
+        r.font.size = UKURAN_KECIL
 
     t = doc.add_table(rows=len(isi), cols=len(isi[0]))
     t.alignment = WD_TABLE_ALIGNMENT.CENTER
@@ -250,6 +259,8 @@ def main() -> int:
     baris = SUMBER.read_text(encoding='utf-8').split('\n')
     i = 0
     nomor_tabel = 0
+    # True bila paragraf tebal 'Tabel N. ...' baru saja ditulis.
+    judul_tabel_siap = False
     halaman_utama_dimulai = False
     kutipan_tertunda: list[str] = []
     subbab_kini = ''
@@ -276,8 +287,11 @@ def main() -> int:
         # Catatan kerja dan hipotesis sama-sama blok kutipan di sumbernya.
         # Yang jelas-jelas catatan diberi warna merah supaya tidak mungkin
         # ikut terkirim ke komite etik tanpa disadari.
-        catatan = 'Catatan' in gabung or 'catatan kerja' in gabung
-        tulis_inline(p, gabung, merah=catatan)
+        catatan = 'Catatan' in gabung or 'catatan kerja' in gabung or '⚠️' in gabung
+        # Peringatan bertanda ⚠️ ikut ditebalkan. Berkas contoh tabel hasil
+        # berisi angka rekaan seluruhnya, dan merah saja terbukti kurang
+        # menonjol untuk sesuatu yang tidak boleh tertukar dengan hasil nyata.
+        tulis_inline(p, gabung, merah=catatan, tebal='⚠️' in gabung)
         doc.add_paragraph()
         kutipan_tertunda = []
 
@@ -286,7 +300,7 @@ def main() -> int:
         s = b.strip()
 
         if s.startswith('>'):
-            kutipan_tertunda.append(s.lstrip('> ').rstrip())
+            kutipan_tertunda.append(s.lstrip('> ').lstrip('#').strip())
             i += 1
             continue
         buang_kutipan()
@@ -345,12 +359,19 @@ def main() -> int:
             while i < len(baris) and baris[i].strip().startswith('|'):
                 blok.append(baris[i])
                 i += 1
-            nomor_tabel += 1
-            # Judul diambil dari sub bab tempat tabelnya berada, supaya tidak
-            # perlu diperbarui manual setiap naskah berubah.
-            nama = re.sub(r'^Lampiran \d+\.\s*', '', subbab_kini).strip()
-            nama = nama[0].upper() + nama[1:] if nama else 'Tabel'
-            sisipkan_tabel(doc, blok, f'Tabel {nomor_tabel}. {nama}.')
+            if judul_tabel_siap:
+                # Naskah sudah memuat judulnya sendiri tepat di atas tabel,
+                # dan judul itu sudah ditulis sebagai paragraf. Menambahkan
+                # judul lagi akan menghasilkan dua judul untuk satu tabel.
+                sisipkan_tabel(doc, blok, None)
+                judul_tabel_siap = False
+            else:
+                nomor_tabel += 1
+                # Judul diambil dari sub bab tempat tabelnya berada, supaya
+                # tidak perlu diperbarui manual setiap naskah berubah.
+                nama = re.sub(r'^Lampiran \d+\.\s*', '', subbab_kini).strip()
+                nama = nama[0].upper() + nama[1:] if nama else 'Tabel'
+                sisipkan_tabel(doc, blok, f'Tabel {nomor_tabel}. {nama}.')
             continue
 
         cocok_daftar = re.match(r'^(\d+)\.\s+(.*)$', s)
@@ -376,6 +397,9 @@ def main() -> int:
         ):
             isi.append(baris[i].strip())
             i += 1
+
+        gabung = ' '.join(isi)
+        judul_tabel_siap = bool(re.match(r'^\*\*Tabel [\d.]+\.', gabung))
 
         if di_daftar_pustaka:
             # Panduan bagian 3: daftar pustaka memakai satu spasi. Barisnya
