@@ -650,14 +650,32 @@ jawab.
 ## 3.2 Tempat dan Waktu Penelitian
 
 Penelitian dilaksanakan di Poliklinik Reumatologi, Departemen Ilmu Penyakit
-Dalam, RSUP H. Adam Malik, Medan. Pengambilan data dilakukan selama tiga bulan
-setelah persetujuan etik diterbitkan.
+Dalam, RSUP H. Adam Malik, Medan.
+
+Terdapat dua jangka waktu yang berbeda dan perlu dibedakan. Rekrutmen
+berlangsung selama dua bulan setelah persetujuan etik diterbitkan, sedangkan
+pemantauan berlangsung tiga bulan bagi tiap peserta terhitung sejak peserta yang
+bersangkutan terdaftar. Karena peserta masuk pada waktu yang berbeda-beda,
+pemantauan peserta terakhir berakhir kira-kira lima bulan setelah rekrutmen
+dimulai. Keseluruhan penelitian, termasuk persiapan, pengolahan, dan penulisan
+laporan, direncanakan selesai dalam delapan bulan sebagaimana diuraikan pada
+Lampiran 1.
 
 ## 3.3 Populasi dan Sampel Penelitian
 
-Populasi penelitian adalah seluruh pasien LES dewasa yang menjalani rawat jalan
-di Poliklinik Reumatologi RSUP H. Adam Malik. Sampel diambil secara konsekutif
-dari pasien yang datang selama periode rekrutmen dan memenuhi kriteria.
+Populasi target penelitian ini adalah pasien LES dewasa di Indonesia. Populasi
+terjangkaunya adalah pasien LES dewasa yang menjalani rawat jalan di Poliklinik
+Reumatologi RSUP H. Adam Malik, Medan, selama periode rekrutmen.
+
+Pengambilan sampel dilakukan secara konsekutif, yaitu seluruh pasien yang datang
+selama periode rekrutmen dan memenuhi kriteria diikutsertakan sampai jumlah
+sampel terpenuhi. Cara tersebut dipilih karena tidak menuntut kerangka sampel
+yang lengkap dan memperkecil bias pemilihan dibandingkan pengambilan sampel
+secara sengaja. Perlu dinyatakan bahwa syarat memiliki telepon pintar Android
+menimbulkan pembatasan tersendiri, sehingga hasil penelitian ini tidak dapat
+digeneralisasi kepada pasien yang tidak memiliki telepon pintar. Keterbatasan
+tersebut melekat pada pertanyaan penelitiannya, sebab kelayakan sebuah aplikasi
+memang hanya dapat dinilai pada orang yang memiliki sarana menjalankannya.
 
 ## 3.4 Kriteria Penelitian
 
@@ -683,18 +701,44 @@ Luaran utama penelitian ini berupa proporsi, yaitu retensi peserta, sehingga
 besar sampel ditentukan berdasarkan presisi dan bukan berdasarkan uji hipotesis.
 Pendekatan tersebut lazim dipakai pada studi kelayakan.
 
-Dengan perkiraan retensi 70%, tingkat kepercayaan 95%, dan presisi absolut 15%,
-besar sampel dihitung dengan rumus berikut.
+Besar sampel dihitung dengan rumus estimasi proporsi pada populasi tunggal
+berikut.
 
 n = Z² × p × (1 − p) / d²    (1)
 
-Dengan memasukkan Z sebesar 1,96, p sebesar 0,70, dan d sebesar 0,15, diperoleh
-n sebesar 35,9 yang dibulatkan menjadi 36 orang. Dengan antisipasi kehilangan
+Nilai Z ditetapkan 1,96 untuk tingkat kepercayaan 95%, dan presisi absolut d
+ditetapkan 0,15. Penetapan proporsi p memerlukan penjelasan tersendiri. Belum
+terdapat penelitian kelayakan aplikasi pendamping LES pada populasi Indonesia
+yang dapat dijadikan dasar perkiraan retensi, dan kepustakaan internasional pun
+tidak menyediakan angka yang dapat dialihkan langsung karena seluruh kajian yang
+tersedia berasal dari negara berpendapatan tinggi dengan alur pelayanan yang
+berbeda (Dantas et al., 2020; Ramasamy et al., 2022). Oleh karena itu p
+ditetapkan 0,50, yaitu nilai yang menghasilkan besar sampel maksimum sehingga
+presisi yang diinginkan tetap tercapai berapa pun proporsi retensi yang
+sebenarnya diperoleh.
+
+Dengan memasukkan Z sebesar 1,96, p sebesar 0,50, dan d sebesar 0,15, diperoleh
+n sebesar 42,7 yang dibulatkan menjadi 43 orang. Dengan antisipasi kehilangan
 pengamatan sebesar 20%, besar sampel terkoreksi dihitung sebagai berikut.
 
-n koreksi = 36 / (1 − 0,20) = 45    (2)
+n koreksi = 43 / (1 − 0,20) = 54    (2)
 
-Besar sampel minimal adalah 45 peserta, dan direncanakan merekrut 50 peserta.
+Besar sampel minimal adalah 54 peserta, dan direncanakan merekrut 55 peserta.
+Sebagai pembanding, apabila retensi diperkirakan 70% sebagaimana lazim
+diasumsikan pada studi kelayakan, besar sampel yang diperlukan hanya 45 peserta.
+Penetapan yang lebih besar dipilih dengan sengaja karena perkiraan yang meleset
+ke arah optimistis akan menghasilkan interval kepercayaan yang lebih lebar
+daripada yang direncanakan, dan luaran utama penelitian ini justru berupa
+proporsi tersebut.
+
+Perlu dinyatakan pula bahwa perhitungan di atas berlaku bagi luaran utama, yaitu
+proporsi retensi. Analisis hubungan kepatuhan minum obat dengan aktivitas
+penyakit pada tujuan khusus butir kelima memiliki kekuatan yang terbatas pada
+besar sampel ini; dengan 54 peserta dan taraf kemaknaan 0,05 dua sisi, kekuatan
+80% hanya tercapai untuk koefisien korelasi sekitar 0,37 atau lebih. Hubungan
+yang lebih lemah dari itu berpeluang besar tidak terdeteksi, dan hasil analisis
+tersebut dilaporkan sebagai temuan yang membutuhkan pembuktian pada penelitian
+berskala lebih besar.
 
 ## 3.6 Identifikasi Variabel
 
@@ -814,9 +858,12 @@ dalam penelitian ini adalah sebagai berikut.
 5. Sisi dokter, meliputi SLEDAI-2K, PGA, dosis glukokortikoid, DORIS, LLDAS, dan
    ringkasan prakunjungan.
 
-Mesin penyaringan tanda bahaya memakai delapan aturan tingkat darurat dan lima
+Mesin penyaringan tanda bahaya memakai tujuh aturan tingkat darurat dan empat
 aturan tingkat mendesak yang seluruhnya bersifat deterministik, tanpa model
-bahasa maupun skor probabilistik. Aplikasi tidak menegakkan diagnosis; aplikasi
+bahasa maupun skor probabilistik. Aturan tersebut dievaluasi terhadap 12
+pertanyaan tanda bahaya dan 6 pertanyaan keadaan mendesak yang diisi peserta,
+dan seluruh aturannya selalu dinilai sehingga urutannya tidak memengaruhi
+hasil. Aplikasi tidak menegakkan diagnosis; aplikasi
 hanya menyarankan peserta menghubungi tim dokter atau datang ke instalasi gawat
 darurat, dan salinan peringatan yang sama dikirim ke kotak masuk dokter
 penanggung jawab.
@@ -866,11 +913,28 @@ Analisis dilakukan dengan perangkat lunak SPSS atau R.
 Data kategorik disajikan sebagai jumlah dan proporsi. Data numerik disajikan
 sebagai rerata dan simpangan baku apabila sebarannya normal, atau median dan
 rentang interkuartil apabila tidak normal. Normalitas sebaran diuji dengan uji
-Kolmogorov-Smirnov. Proporsi retensi dilaporkan beserta interval kepercayaan 95%.
+Shapiro-Wilk, bukan uji Kolmogorov-Smirnov, sebab uji Shapiro-Wilk memiliki
+kekuatan yang lebih baik dalam mendeteksi penyimpangan dari sebaran normal pada
+besar sampel sedang seperti yang direncanakan pada penelitian ini. Proporsi retensi dilaporkan beserta interval kepercayaan 95%
+yang dihitung dengan metode Wilson, sebab metode Wald yang lazim dipakai
+menghasilkan batas yang tidak tepat pada proporsi yang mendekati nol atau satu
+dan pada besar sampel yang tidak besar.
 
 Kepatuhan tercatat dan cakupan pencatatan dilaporkan sebagai median dan rentang
 interkuartil per peserta, dan tidak digabungkan menjadi satu angka tanpa
 menyebutkan asumsinya.
+
+Penanganan data yang tidak lengkap perlu dinyatakan secara khusus, sebab pada
+penelitian ini ketidaklengkapan bukan gangguan yang harus disingkirkan melainkan
+justru merupakan luaran yang diukur. Hari tanpa catatan harian tidak diimputasi
+dan tidak diperlakukan sebagai keadaan tanpa gejala; hari tersebut dihitung
+sebagai hari tidak terisi dan masuk ke dalam penyebut kelengkapan pengisian.
+Peserta yang berhenti memakai aplikasi tetap disertakan dalam analisis retensi
+sesuai asas *intention to treat*, dan pengeluaran peserta dari analisis hanya
+dilakukan bila peserta menarik persetujuannya. Untuk luaran klinis yang hanya
+tersedia pada peserta dengan penilaian awal dan akhir yang lengkap, jumlah
+peserta yang dianalisis dinyatakan pada tiap tabel, dan hasilnya tidak
+digeneralisasi kepada peserta yang berhenti di tengah jalan.
 
 ### 3.11.2 Analisis bivariat
 
@@ -879,6 +943,15 @@ berpasangan apabila sebarannya normal, atau uji Wilcoxon apabila tidak normal.
 Hubungan kepatuhan minum obat dengan SLEDAI-2K diuji dengan korelasi Pearson atau
 Spearman sesuai sebaran data. Nilai p dua sisi kurang dari 0,05 dianggap
 bermakna.
+
+Kepatuhan pada analisis tersebut diukur dengan skor MARS-5. **⚠️** Apabila izin
+penggunaan MARS-5 tidak diperoleh sebelum rekrutmen dimulai, analisis hubungan
+tersebut memakai proporsi dosis yang ditandai diminum dari seluruh dosis yang
+tercatat pada aplikasi, yaitu ukuran yang dihasilkan aplikasi itu sendiri dan
+tidak berhak cipta. Penggantian tersebut diputuskan sebelum peserta pertama
+direkrut dan tidak dilakukan di tengah pengumpulan data, sebab mengganti alat
+ukur pada pertengahan penelitian membuat kedua bagian datanya tidak dapat
+digabungkan.
 
 ### 3.11.3 Analisis multivariat
 
