@@ -42,3 +42,7 @@ example
 /ios
 /android
 .env
+
+# Hasil penelitian/ke-word.py. Sengaja tidak dilacak: berkas ini akan disunting
+# di Word lalu diserahkan, dan menjalankan ulang skriptnya akan menimpanya.
+penelitian/*.docx
